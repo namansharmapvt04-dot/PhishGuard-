@@ -1,54 +1,28 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/PhishGuard-Security%20Tool-red?style=for-the-badge&logo=shield&logoColor=white" alt="PhishGuard" />
+# 🎣 PhishGuard
 
-# 🛡️ PhishGuard
+### AI-Powered Phishing Simulation & Security Awareness Platform
 
-### AI-Powered Phishing Detection & URL Analysis Tool
+**OJT Project — Polaris School of Technology, Bengaluru | 2025**
 
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-1C3C3C?style=flat-square&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA--3--70B-F55036?style=flat-square&logo=groq&logoColor=white)](https://console.groq.com/)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange?style=flat-square)](https://www.trychroma.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![GitHub Stars](https://img.shields.io/github/stars/namansharmapvt04-dot/PhishGuard-?style=flat-square&color=gold)](https://github.com/namansharmapvt04-dot/PhishGuard-)
-[![Issues](https://img.shields.io/github/issues/namansharmapvt04-dot/PhishGuard-?style=flat-square)](https://github.com/namansharmapvt04-dot/PhishGuard-/issues)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
-
-<br/>
-
-> **Protect yourself and your users from phishing attacks with real-time URL scanning, threat intelligence, and machine-learning-based detection.**
-
-<br/>
-
-[🚀 Getting Started](#-getting-started) • [✨ Features](#-features) • [📸 Screenshots](#-screenshots) • [🤝 Contributing](#-contributing) • [📄 License](#-license)
 
 </div>
 
 ---
 
-## 📖 Table of Contents
+## 📖 Overview
 
-- [About the Project](#-about-the-project)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-- [Usage](#-usage)
-- [Project Structure](#-project-structure)
-- [API Reference](#-api-reference)
-- [Screenshots](#-screenshots)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Contact](#-contact)
+**PhishGuard** is an intelligent phishing simulation platform that helps organizations train employees to recognize and resist phishing attacks. Instead of manual template creation, PhishGuard uses a **multi-agent AI pipeline** (powered by **LangGraph + Groq**) to automatically generate realistic, personalized phishing emails, run campaigns against target employees, track engagement, and produce actionable security awareness reports.
 
----
-
-## 🔍 About the Project
-
-**PhishGuard** is an intelligent cybersecurity tool designed to detect, analyze, and block phishing URLs in real time. Leveraging machine learning models, heuristic analysis, and threat intelligence feeds, PhishGuard helps individuals and organizations stay protected against one of the most common forms of cyberattack.
-
-Phishing attacks account for over **36% of all data breaches** (Verizon DBIR, 2024). PhishGuard provides a multi-layered defense system to identify malicious links before they cause harm.
+> **Key idea:** Automate the "Red Team" phishing workflow with AI — from template drafting to insight analysis — so security teams can run continuous awareness programs at scale without manual effort.
 
 ---
 
@@ -56,171 +30,91 @@ Phishing attacks account for over **36% of all data breaches** (Verizon DBIR, 20
 
 | Feature | Description |
 |---|---|
-| 🔗 **URL Scanner** | Instantly scan any URL for phishing indicators |
-| 🤖 **ML Detection** | Machine learning model trained on thousands of phishing/legitimate URLs |
-| 🌐 **Threat Intelligence** | Integration with external threat intelligence feeds |
-| 📊 **Risk Scoring** | Detailed risk score with explanation of detected red flags |
-| 🔔 **Real-time Alerts** | Get notified when a suspicious link is detected |
-| 📈 **Analytics Dashboard** | Visual dashboard showing scan history and threat trends |
-| 🧩 **Browser Extension** | Optional browser extension for on-the-fly protection |
-| 🔑 **REST API** | Public API for developers to integrate PhishGuard into their apps |
-| 📋 **Whitelist / Blacklist** | Manage custom trusted and blocked domains |
-| 🔒 **Privacy First** | No user data is stored; scans are ephemeral |
+| 🤖 **AI Campaign Generation** | LangGraph multi-agent pipeline drafts, evaluates, and personalizes phishing emails automatically |
+| 📊 **RAGAS Quality Gate** | Templates are scored by RAGAS (≥ 0.75) before sending; low-quality drafts are retried or escalated |
+| 🔍 **RAG-powered Realism** | ChromaDB retrieves top-5 real phishing patterns to ground AI generation in authentic tactics |
+| 📅 **Flexible Scheduling** | Campaigns can start immediately or be scheduled for a future date/time |
+| ⏸ **Pause & Resume** | Active campaigns can be paused and resumed without resending emails |
+| 📈 **Real-time Tracking** | SSE (Server-Sent Events) stream click/open/submit events to the dashboard live |
+| 🛡️ **Insight Reports** | Insight Analyst agent generates per-campaign phishing susceptibility reports |
+| 🏢 **Multi-tenant Ready** | Organizations and managers are isolated; JWT-based role auth (Admin / Manager) |
 
 ---
 
-## 🛠️ Tech Stack
+## 🏗️ Architecture
 
-**Backend:**
-- ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white) Python 3.8+
-- ![Flask](https://img.shields.io/badge/Flask-000000?style=flat-square&logo=flask&logoColor=white) Flask / FastAPI
-- ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikit-learn&logoColor=white) scikit-learn (ML model)
+### LangGraph Multi-Agent Pipeline
 
-**Frontend:**
-- ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) HTML5
-- ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white) CSS3
-- ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) JavaScript (Vanilla)
+```
+Campaign Planner
+      │
+      ▼
+Template Generator  ◄──── ChromaDB (RAG: top-5 phishing patterns)
+      │
+      ▼
+Realism Evaluator   ◄──── RAGAS scoring (threshold: 0.75)
+      │
+      ├── score < 0.75 → retry (max 3×) → ESCALATED
+      │
+      └── score ≥ 0.75
+            │
+            ▼
+Personalisation Agent  ◄──── Target employee data
+            │
+            ▼
+    Insight Analyst  (runs after campaign DONE)
+```
 
-**Data & Intelligence:**
-- ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white) SQLite / PostgreSQL
-- VirusTotal API
-- Google Safe Browsing API
+### Campaign State Machine
+
+```
+DRAFT ──► GENERATING ──► READY ──► RUNNING ──► DONE
+                │                     │
+             (fail×3)                 ↕
+                │                  PAUSED
+                ▼
+           ESCALATED         SCHEDULED
+```
+
+| State | Description |
+|---|---|
+| `DRAFT` | Campaign created, not yet launched |
+| `GENERATING` | AI pipeline running — templates being generated |
+| `READY` | Template approved (RAGAS score ≥ 0.75) |
+| `ESCALATED` | All 3 AI retries failed — awaiting admin review |
+| `SCHEDULED` | Approved and queued for a future start time |
+| `RUNNING` | Emails live; click/open tracking active |
+| `PAUSED` | Tracking suspended by manager |
+| `DONE` | Tracking window closed; report available |
 
 ---
 
-## 🚀 Getting Started
+## 🧰 Tech Stack
 
-### Prerequisites
+### Backend
 
-Make sure you have the following installed:
+| Layer | Technology |
+|---|---|
+| API Framework | FastAPI + Uvicorn |
+| Agent Orchestration | LangGraph 0.2+ |
+| Primary LLM | Groq — `llama-3-70b-8192` (free tier, low latency) |
+| Fallback LLM | OpenAI `gpt-4o` (quality escalation) |
+| Embedding Model | `all-MiniLM-L6-v2` (runs locally on CPU) |
+| Vector Store | ChromaDB (≈ 1,000 phishing patterns) |
+| Evaluation | RAGAS (faithfulness + relevancy scoring) |
+| Database | PostgreSQL 16 |
+| Cache / Queue | Redis |
+| Auth | JWT (HS256) — Admin / Manager roles |
+| Real-time | SSE (Server-Sent Events) |
 
-- Python `3.8` or higher
-- `pip` (Python package manager)
-- Git
+### Frontend
 
-```bash
-python --version   # Should be 3.8+
-pip --version
-git --version
-```
-
-### Installation
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/namansharmapvt04-dot/PhishGuard-.git
-cd PhishGuard-
-```
-
-2. **Create and activate a virtual environment**
-
-```bash
-# On Windows
-python -m venv venv
-venv\Scripts\activate
-
-# On macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. **Install dependencies**
-
-```bash
-pip install -r requirements.txt
-```
-
-4. **Run the application**
-
-```bash
-python app.py
-```
-
-The application will be running at `http://localhost:5000`
-
-### Configuration
-
-Copy the example environment file and configure your API keys:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials:
-
-```env
-# App Settings
-SECRET_KEY=your_secret_key_here
-DEBUG=False
-
-# API Keys
-VIRUSTOTAL_API_KEY=your_virustotal_api_key
-GOOGLE_SAFE_BROWSING_KEY=your_google_api_key
-
-# Database
-DATABASE_URL=sqlite:///phishguard.db
-```
-
-> 💡 **Tip:** You can get a free VirusTotal API key at [virustotal.com](https://www.virustotal.com) and a Google Safe Browsing key from the [Google Cloud Console](https://console.cloud.google.com/).
-
----
-
-## 💡 Usage
-
-### Scan a URL via Web Interface
-
-1. Open `http://localhost:5000` in your browser
-2. Paste the URL you want to check into the input box
-3. Click **"Scan URL"**
-4. View the detailed analysis report with risk score
-
-### Scan via CLI
-
-```bash
-python phishguard.py scan --url "https://example-suspicious-site.com"
-```
-
-Sample output:
-```
-🔍 Scanning: https://example-suspicious-site.com
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  RISK SCORE: 87/100 — HIGH RISK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚩 Domain registered < 30 days ago
-🚩 IP-based URL detected
-🚩 Suspicious keyword in domain: "login", "verify"
-🚩 SSL certificate mismatch
-🚩 Flagged by VirusTotal (3/90 engines)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Recommendation: DO NOT visit this URL
-```
-
-### Use the REST API
-
-```bash
-# Scan a URL
-curl -X POST http://localhost:5000/api/scan \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://suspicious-site.com"}'
-```
-
-**Response:**
-
-```json
-{
-  "url": "https://suspicious-site.com",
-  "risk_score": 87,
-  "risk_level": "HIGH",
-  "is_phishing": true,
-  "indicators": [
-    "Domain age < 30 days",
-    "Suspicious keywords detected",
-    "SSL mismatch"
-  ],
-  "scanned_at": "2026-09-29T15:06:57+05:30"
-}
-```
+| Layer | Technology |
+|---|---|
+| Framework | React 18 |
+| State Management | Context API + React Query |
+| Styling | Tailwind CSS |
+| Charts | Recharts |
 
 ---
 
@@ -228,109 +122,201 @@ curl -X POST http://localhost:5000/api/scan \
 
 ```
 PhishGuard-/
-├── 📁 models/              # ML model files
-│   ├── phish_model.pkl
-│   └── vectorizer.pkl
-├── 📁 static/              # CSS, JS, images
-│   ├── css/
-│   └── js/
-├── 📁 templates/           # HTML templates
-│   ├── index.html
-│   └── report.html
-├── 📁 data/                # Training datasets
-│   ├── phishing_urls.csv
-│   └── legitimate_urls.csv
-├── 📁 tests/               # Unit and integration tests
-│   ├── test_scanner.py
-│   └── test_api.py
-├── 📄 app.py               # Main Flask application
-├── 📄 phishguard.py        # CLI entry point
-├── 📄 scanner.py           # Core URL scanning logic
-├── 📄 train_model.py       # ML model training script
-├── 📄 requirements.txt     # Python dependencies
-├── 📄 .env.example         # Example environment variables
-└── 📄 README.md            # This file
+├── backend/
+│   ├── app/
+│   │   ├── agents/                  # LangGraph agents
+│   │   │   ├── campaign_planner.py
+│   │   │   ├── template_generator.py
+│   │   │   ├── realism_evaluator.py
+│   │   │   ├── personalisation_agent.py
+│   │   │   └── insight_analyst.py
+│   │   ├── api/                     # FastAPI routers
+│   │   │   ├── campaigns.py
+│   │   │   ├── auth.py
+│   │   │   └── tracking.py
+│   │   ├── models/                  # SQLAlchemy ORM models
+│   │   ├── rag/                     # ChromaDB + embeddings
+│   │   └── core/                    # Config, JWT, SSE
+│   ├── tests/
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   ├── components/
+│   │   └── hooks/
+│   └── package.json
+├── docs/
+│   ├── BRD.docx                     # Business Requirements Document
+│   └── TRD.docx                     # Technical Requirements Document
+└── README.md
 ```
 
 ---
 
-## 📡 API Reference
+## 🚀 Getting Started
 
-| Endpoint | Method | Description |
+### Prerequisites
+
+- Python `3.11+`
+- Node.js `20+`
+- PostgreSQL `16`
+- Redis `7`
+- A [Groq API key](https://console.groq.com/) (free)
+- Optional: OpenAI API key (fallback LLM)
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/namansharmapvt04-dot/PhishGuard-.git
+cd PhishGuard-
+```
+
+### 2. Backend setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate       # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env and fill in your keys (see below)
+
+# Run database migrations
+alembic upgrade head
+
+# Seed the ChromaDB vector store with phishing patterns
+python scripts/seed_chromadb.py
+
+# Start the FastAPI server
+uvicorn app.main:app --reload --port 8000
+```
+
+### 3. Frontend setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`.
+
+### Environment Variables
+
+```env
+# .env
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/phishguard
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# JWT
+SECRET_KEY=your_super_secret_key_here
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# LLM (primary)
+GROQ_API_KEY=gsk_...
+
+# LLM (fallback, optional)
+OPENAI_API_KEY=sk-...
+
+# ChromaDB
+CHROMA_PERSIST_DIR=./chroma_db
+
+# App
+ENVIRONMENT=development
+FRONTEND_URL=http://localhost:5173
+```
+
+---
+
+## 🔌 API Endpoints (Key)
+
+| Method | Endpoint | Description |
 |---|---|---|
-| `/api/scan` | `POST` | Scan a URL for phishing |
-| `/api/batch-scan` | `POST` | Scan multiple URLs at once |
-| `/api/report` | `GET` | Get scan report by ID |
-| `/api/whitelist` | `POST` | Add a domain to whitelist |
-| `/api/blacklist` | `POST` | Add a domain to blacklist |
-| `/api/stats` | `GET` | Get overall scanning statistics |
+| `POST` | `/api/auth/login` | Login, returns JWT |
+| `POST` | `/api/campaigns/` | Create new campaign (`DRAFT`) |
+| `POST` | `/api/campaigns/{id}/launch` | Launch AI generation |
+| `GET` | `/api/campaigns/{id}/stream` | SSE stream for real-time status |
+| `PATCH` | `/api/campaigns/{id}/pause` | Pause a running campaign |
+| `PATCH` | `/api/campaigns/{id}/resume` | Resume a paused campaign |
+| `GET` | `/api/campaigns/{id}/report` | Fetch insight report (`DONE` only) |
+| `GET` | `/api/tracking/click/{token}` | Employee click-tracking pixel |
 
 ---
 
-## 📸 Screenshots
+## 🤖 How the AI Pipeline Works
 
-> _Screenshots will be added as the project develops._
+1. **Campaign Planner** — Takes the campaign goal (e.g., *"IT credential phishing"*) and drafts a strategy: sender persona, subject line approach, urgency level, and call-to-action type.
 
----
+2. **Template Generator** — Queries ChromaDB for the top-5 most relevant real-world phishing patterns (RAG), then asks Groq's LLaMA-3 to generate the email body grounded in those examples.
 
-## 🗺️ Roadmap
+3. **Realism Evaluator** — Scores the template using RAGAS metrics (faithfulness to real patterns + relevancy to campaign goal). If score < 0.75, the pipeline retries up to 3 times. After 3 failures, the campaign is marked `ESCALATED` and flagged for admin review.
 
-- [x] Core URL scanning engine
-- [x] ML-based phishing detection
-- [x] REST API
-- [x] Web interface
-- [ ] Browser extension (Chrome & Firefox)
-- [ ] Email phishing scanner
-- [ ] Real-time threat feed integration
-- [ ] Docker containerization
-- [ ] Mobile app
+4. **Personalisation Agent** — Takes the approved template and customises it per target employee (name, role, department, company-specific details) to maximise realism.
+
+5. **Insight Analyst** — After the tracking window closes, analyses click/open/submit data and writes a phishing susceptibility report per campaign and per department.
 
 ---
 
-## 🤝 Contributing
+## 📊 RAG Setup (ChromaDB)
 
-Contributions are what make the open-source community amazing! Any contributions you make are **greatly appreciated**.
+The vector store contains ~1,000 real phishing email patterns sourced from public security research datasets. Each document is embedded using `sentence-transformers/all-MiniLM-L6-v2` (runs locally, no API cost).
 
-1. **Fork** the Project
-2. **Create** your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** to the Branch (`git push origin feature/AmazingFeature`)
-5. **Open** a Pull Request
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
----
-
-## 🐛 Bug Reports
-
-If you find a bug, please open an [issue](https://github.com/namansharmapvt04-dot/PhishGuard-/issues) with:
-- A clear description of the bug
-- Steps to reproduce
-- Expected vs actual behavior
-- Screenshots if applicable
+```python
+# Retrieval example
+results = collection.query(
+    query_texts=["IT credential reset phishing"],
+    n_results=5
+)
+# Returns top-5 closest phishing patterns → passed to Template Generator as context
+```
 
 ---
 
-## 📄 License
+## 👨‍💻 Team
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+| Name | Roll No | Role |
+|---|---|---|
+| **Naman Sharma** | 251810700011 | Backend, LangGraph agents, API, DB |
+| **Pratham V Doyizode** | — | Frontend, UI/UX, Campaign dashboard |
+
+**Institution:** Polaris School of Technology, Bengaluru
+**Program:** B.Tech CSE — On-the-Job Training (OJT) 2025
 
 ---
 
-## 📬 Contact
+## 📄 Documentation
 
-**Naman Sharma**
+| Document | Description |
+|---|---|
+| `docs/BRD.docx` | Business Requirements Document — scope, stakeholders, revenue model |
+| `docs/TRD.docx` | Technical Requirements Document — architecture, APIs, DB schema |
 
-[![GitHub](https://img.shields.io/badge/GitHub-namansharmapvt04--dot-black?style=flat-square&logo=github)](https://github.com/namansharmapvt04-dot)
+---
 
-Project Link: [https://github.com/namansharmapvt04-dot/PhishGuard-](https://github.com/namansharmapvt04-dot/PhishGuard-)
+## ⚠️ Disclaimer
+
+PhishGuard is intended **strictly for authorised security awareness training** within organisations that have obtained written consent from all participants. Sending phishing simulations without proper authorisation is illegal and unethical. The authors are not responsible for any misuse of this software.
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
 
-Made with ❤️ by [Naman Sharma](https://github.com/namansharmapvt04-dot)
-
-⭐ **Star this repo if you find it helpful!** ⭐
+Made with ❤️ at **Polaris School of Technology, Bengaluru**
 
 </div>
