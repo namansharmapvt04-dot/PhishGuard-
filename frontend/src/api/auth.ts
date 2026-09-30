@@ -1,4 +1,5 @@
 import { api, tokenStore } from './client'
+import { isDemo, demoUser, demoDelay } from '../lib/demo'
 
 export interface Organization {
   id: string
@@ -42,6 +43,7 @@ export const authApi = {
   },
 
   async me(): Promise<User> {
+    if (isDemo()) return demoDelay(demoUser, 150)
     const { data } = await api.get<User>('/auth/me')
     return data
   },

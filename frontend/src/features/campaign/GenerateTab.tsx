@@ -5,6 +5,7 @@ import { Campaign } from '../../api/campaigns'
 import { targetsApi } from '../../api/targets'
 import { streamGeneration, SSEMessage } from '../../lib/sse'
 import { RAGAS_THRESHOLD } from '../../lib/constants'
+import { isDemo, simulateGeneration } from '../../lib/demo'
 
 // LangGraph node keys → friendly labels (order matches the pipeline).
 const NODE_LABELS: Record<string, string> = {
@@ -33,7 +34,7 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState('')
   const [finished, setFinished] = useState<null | 'completed' | 'failed'>(null)
-  const controllerRef = useRef<AbortController | null>(null)
+  const cancelRef = useRef<(() => void) | null>(null)
   const logId = useRef(0)
 
   const { data: targets } = useQuery({
@@ -45,7 +46,7 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
     ['DRAFT', 'ESCALATED'].includes(campaign.state) && (targets?.length ?? 0) > 0
 
   useEffect(() => {
-    return () => controllerRef.current?.abort()
+    return () => cancelRef.current?.()
   }, [])
 
   function addLog(text: string, tone: LogEntry['tone'] = 'info') {
@@ -115,19 +116,28 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
     setSteps({})
     setFinished(null)
     setRunning(true)
-    controllerRef.current = streamGeneration(campaign.id, {
+
+    const onDone = () => {
+      setRunning(false)
+      qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
+      qc.invalidateQueries({ queryKey: ['campaigns'] })
+    }
+
+    if (isDemo()) {
+      cancelRef.current = simulateGeneration(campaign.id, { onMessage: handleMessage, onDone })
+      return
+    }
+
+    const controller = streamGeneration(campaign.id, {
       onMessage: handleMessage,
       onError: (err) => {
         setError(err.message)
         setRunning(false)
         qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
       },
-      onDone: () => {
-        setRunning(false)
-        qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
-        qc.invalidateQueries({ queryKey: ['campaigns'] })
-      },
+      onDone,
     })
+    cancelRef.current = () => controller.abort()
   }
 
   return (

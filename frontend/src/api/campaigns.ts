@@ -1,4 +1,5 @@
 import { api } from './client'
+import { isDemo, demoApi } from '../lib/demo'
 
 export type CampaignState =
   | 'DRAFT'
@@ -80,33 +81,44 @@ export interface CampaignStats {
 
 export const campaignsApi = {
   async list(): Promise<Campaign[]> {
+    if (isDemo()) return demoApi.listCampaigns()
     const { data } = await api.get<Campaign[]>('/campaigns')
     return data
   },
   async get(id: string): Promise<Campaign> {
+    if (isDemo()) return demoApi.getCampaign(id)
     const { data } = await api.get<Campaign>(`/campaigns/${id}`)
     return data
   },
   async create(payload: CampaignCreate): Promise<Campaign> {
+    if (isDemo()) return demoApi.createCampaign(payload)
     const { data } = await api.post<Campaign>('/campaigns', payload)
     return data
   },
   async update(id: string, payload: CampaignUpdate): Promise<Campaign> {
+    if (isDemo()) return demoApi.updateCampaign(id, payload)
     const { data } = await api.patch<Campaign>(`/campaigns/${id}`, payload)
     return data
   },
   async remove(id: string): Promise<void> {
+    if (isDemo()) {
+      await demoApi.removeCampaign(id)
+      return
+    }
     await api.delete(`/campaigns/${id}`)
   },
   async pause(id: string): Promise<Campaign> {
+    if (isDemo()) return demoApi.setState(id, 'PAUSED')
     const { data } = await api.post<Campaign>(`/campaigns/${id}/pause`)
     return data
   },
   async resume(id: string): Promise<Campaign> {
+    if (isDemo()) return demoApi.setState(id, 'RUNNING')
     const { data } = await api.post<Campaign>(`/campaigns/${id}/resume`)
     return data
   },
   async stats(id: string): Promise<CampaignStats> {
+    if (isDemo()) return demoApi.stats(id)
     const { data } = await api.get<CampaignStats>(`/campaigns/${id}/stats`)
     return data
   },
