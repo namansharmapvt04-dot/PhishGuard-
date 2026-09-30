@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-navy-950 text-slate-200 font-sans antialiased;
+    /* subtle cyber grid */
+    background-image:
+      linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #162d57 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    @apply bg-navy-700 rounded-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-navy-900/80 border border-navy-700/60 rounded-xl p-6 backdrop-blur-sm;
+  }
+
+  .stat-card {
+    @apply card flex flex-col gap-1;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-cyber-blue/50
+           disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+
+  .btn-primary {
+    @apply btn text-white bg-gradient-to-r from-cyber-blue to-cyber-cyan
+           hover:shadow-glow hover:brightness-110 active:brightness-95;
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-300 bg-navy-800/60 border border-navy-700
+           hover:bg-navy-700/60 hover:text-white;
+  }
+
+  .btn-danger {
+    @apply btn text-white bg-cyber-red/90 hover:bg-cyber-red;
+  }
+
+  .input {
+    @apply w-full rounded-lg bg-navy-950/70 border border-navy-700 px-3 py-2 text-sm text-slate-100
+           placeholder:text-slate-500 focus:outline-none focus:border-cyber-blue
+           focus:ring-1 focus:ring-cyber-blue/60 transition-colors;
+  }
+
+  .label {
+    @apply block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border;
+  }
+  .badge-blue {
+    @apply badge bg-cyber-blue/10 text-cyber-blue border-cyber-blue/30;
+  }
+  .badge-cyan {
+    @apply badge bg-cyber-cyan/10 text-cyber-cyan border-cyber-cyan/30;
+  }
+  .badge-green {
+    @apply badge bg-cyber-green/10 text-cyber-green border-cyber-green/30;
+  }
+  .badge-red {
+    @apply badge bg-cyber-red/10 text-cyber-red border-cyber-red/30;
+  }
+  .badge-amber {
+    @apply badge bg-cyber-amber/10 text-cyber-amber border-cyber-amber/30;
+  }
+  .badge-gray {
+    @apply badge bg-slate-500/10 text-slate-400 border-slate-500/30;
+  }
+
+  .table-th {
+    @apply text-left text-xs font-semibold uppercase tracking-wide text-slate-400 px-4 py-3;
+  }
+  .table-td {
+    @apply px-4 py-3 text-sm text-slate-200 border-t border-navy-800;
+  }
+}
