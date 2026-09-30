@@ -9,21 +9,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.cd c:\Desktop\PhishGuard\backend
-venv\Scripts\activate
-
-# Run all tests with verbose output
-venv\Scripts\python -m pytest tests/ -v
-
-# Run with coverage report
-venv\Scripts\python -m pytest tests/ -v --cov=app --cov-report=term-missing
-
-# Run just one file
-venv\Scripts\python -m pytest tests/test_auth.py -v
-
-# Run a single test
-venv\Scripts\python -m pytest tests/test_auth.py::test_login_success -v
-2+-1C3C3C?style=flat-square&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-1C3C3C?style=flat-square&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
 [![Groq](https://img.shields.io/badge/Groq-LLaMA--3--70B-F55036?style=flat-square&logo=groq&logoColor=white)](https://console.groq.com/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-orange?style=flat-square)](https://www.trychroma.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
@@ -220,6 +206,23 @@ npm run dev
 ```
 
 The app will be available at `http://localhost:5173`.
+
+### Running Tests (backend)
+
+```bash
+cd backend
+venv\Scripts\activate            # Windows (source venv/bin/activate on macOS/Linux)
+
+# Run all tests
+python -m pytest tests/ -v
+
+# With coverage report
+python -m pytest tests/ -v --cov=app --cov-report=term-missing
+
+# A single file or test
+python -m pytest tests/test_auth.py -v
+python -m pytest tests/test_auth.py::test_login_success -v
+```
 
 ### Environment Variables
 
