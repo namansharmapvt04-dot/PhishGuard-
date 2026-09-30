@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { apiError } from '../api/client'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, enterDemo } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard'
@@ -78,6 +78,20 @@ export default function Login() {
 
           <button type="submit" className="btn-primary w-full" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+
+          <div className="flex items-center gap-3 pt-1 text-xs text-slate-500">
+            <span className="h-px flex-1 bg-navy-700" /> or <span className="h-px flex-1 bg-navy-700" />
+          </div>
+          <button
+            type="button"
+            className="btn-ghost w-full"
+            onClick={() => {
+              enterDemo()
+              navigate('/dashboard', { replace: true })
+            }}
+          >
+            Explore the demo (no backend needed)
           </button>
         </form>
 

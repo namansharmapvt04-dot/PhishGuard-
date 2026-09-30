@@ -1,4 +1,5 @@
 import { api } from './client'
+import { isDemo, demoApi } from '../lib/demo'
 
 export type TargetStatus = 'PENDING' | 'SENT' | 'FAILED'
 
@@ -36,23 +37,31 @@ export interface TargetActivity {
 
 export const targetsApi = {
   async list(campaignId: string): Promise<Target[]> {
+    if (isDemo()) return demoApi.listTargets(campaignId)
     const { data } = await api.get<Target[]>(`/campaigns/${campaignId}/targets`)
     return data
   },
   async add(campaignId: string, payload: TargetCreate): Promise<Target> {
+    if (isDemo()) return demoApi.addTarget(campaignId, payload)
     const { data } = await api.post<Target>(`/campaigns/${campaignId}/targets`, payload)
     return data
   },
   async bulkAdd(campaignId: string, targets: TargetCreate[]): Promise<Target[]> {
+    if (isDemo()) return demoApi.bulkAddTargets(campaignId, targets)
     const { data } = await api.post<Target[]>(`/campaigns/${campaignId}/targets/bulk`, {
       targets,
     })
     return data
   },
   async remove(campaignId: string, targetId: string): Promise<void> {
+    if (isDemo()) {
+      await demoApi.removeTarget(campaignId, targetId)
+      return
+    }
     await api.delete(`/campaigns/${campaignId}/targets/${targetId}`)
   },
   async activity(campaignId: string): Promise<TargetActivity[]> {
+    if (isDemo()) return demoApi.activity(campaignId)
     const { data } = await api.get<TargetActivity[]>(`/campaigns/${campaignId}/targets/activity`)
     return data
   },

@@ -1,14 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { authApi, User, RegisterPayload } from '../api/auth'
 import { tokenStore } from '../api/client'
+import { isDemo, enableDemo, disableDemo, demoUser } from '../lib/demo'
 
 interface AuthContextValue {
   user: User | null
   loading: boolean
   isAuthenticated: boolean
+  demo: boolean
   login: (email: string, password: string) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
   logout: () => Promise<void>
+  enterDemo: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -21,6 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     async function bootstrap() {
+      if (isDemo()) {
+        setUser(demoUser)
+        setLoading(false)
+        return
+      }
       if (!tokenStore.access) {
         setLoading(false)
         return
@@ -53,13 +61,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    if (isDemo()) {
+      disableDemo()
+      setUser(null)
+      return
+    }
     await authApi.logout()
     setUser(null)
   }, [])
 
+  const enterDemo = useCallback(() => {
+    enableDemo()
+    setUser(demoUser)
+  }, [])
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, isAuthenticated: !!user, login, register, logout }}
+      value={{
+        user,
+        loading,
+        isAuthenticated: !!user,
+        demo: isDemo(),
+        login,
+        register,
+        logout,
+        enterDemo,
+      }}
     >
       {children}
     </AuthContext.Provider>
