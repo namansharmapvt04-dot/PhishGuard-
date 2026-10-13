@@ -144,7 +144,7 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
     <div className="space-y-5">
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="flex items-center gap-2 font-semibold text-white">
+          <h3 className="flex items-center gap-2 font-semibold text-foreground">
             <Sparkles className="h-4 w-4 text-cyber-cyan" /> AI email generation
           </h3>
           <p className="mt-1 text-sm text-slate-400">
@@ -225,7 +225,7 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
             <CheckCircle2 className="h-4 w-4" /> <span className="font-semibold">Draft ready</span>
           </div>
           <p className="text-sm text-slate-400">
-            Subject: <span className="text-slate-200">{campaign.email_subject}</span>
+            Subject: <span className="text-foreground">{campaign.email_subject}</span>
           </p>
           <p className="mt-1 text-xs text-slate-500">See the “Email Preview” tab for the full body.</p>
         </div>
@@ -254,8 +254,8 @@ function StepRow({ label, status }: { label: string; status: StepStatus }) {
           status === 'pending'
             ? 'text-sm text-slate-500'
             : status === 'active'
-              ? 'text-sm font-medium text-white'
-              : 'text-sm text-slate-300'
+              ? 'text-sm font-medium text-foreground'
+              : 'text-sm text-foreground/80'
         }
       >
         {label}

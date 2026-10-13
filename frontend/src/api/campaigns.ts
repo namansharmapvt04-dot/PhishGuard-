@@ -122,4 +122,9 @@ export const campaignsApi = {
     const { data } = await api.get<CampaignStats>(`/campaigns/${id}/stats`)
     return data
   },
+  async analyse(id: string): Promise<Campaign> {
+    if (isDemo()) return demoApi.getCampaign(id)
+    const { data } = await api.post<Campaign>(`/campaigns/${id}/analyse`)
+    return data
+  },
 }

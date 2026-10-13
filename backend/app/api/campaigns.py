@@ -13,7 +13,7 @@ from app.dependencies import CurrentUser, DB
 from app.models.campaign import Campaign, CampaignState
 from app.models.tracking import TrackingEvent, EventType
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut, CampaignStats
-from app.agents import generation_pipeline, AgentState
+from app.agents import generation_pipeline, insight_pipeline, AgentState
 from app.core.sse import sse_format, SSEEvent
 
 log = structlog.get_logger(__name__)
@@ -201,10 +201,7 @@ async def resume_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
 
 # ── Stats ─────────────────────────────────────────────────────────────────
 
-@router.get("/{campaign_id}/stats", response_model=CampaignStats)
-async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    campaign = await _get_campaign_or_404(campaign_id, current_user, db)
-
+async def _compute_stats(campaign_id: uuid.UUID, db: DB) -> CampaignStats:
     from app.models.target import Target, TargetStatus
     total_q = await db.execute(
         select(func.count()).where(Target.campaign_id == campaign_id)
@@ -215,9 +212,6 @@ async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: 
         select(func.count()).where(Target.campaign_id == campaign_id, Target.status == TargetStatus.SENT)
     )
     sent = sent_q.scalar_one()
-
-    def count_event(event_type: EventType) -> int:
-        return 0  # populated via subquery in production; simplified here
 
     async def _count(etype: EventType) -> int:
         q = await db.execute(
@@ -243,6 +237,58 @@ async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: 
         click_rate=round(clicked / sent, 4) if sent else 0.0,
         compromise_rate=round(submitted / sent, 4) if sent else 0.0,
     )
+
+
+@router.get("/{campaign_id}/stats", response_model=CampaignStats)
+async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    await _get_campaign_or_404(campaign_id, current_user, db)
+    return await _compute_stats(campaign_id, db)
+
+
+# ── Insight analyst ──────────────────────────────────────────────────────────
+
+@router.post("/{campaign_id}/analyse", response_model=CampaignOut)
+async def analyse_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """
+    Runs the insight-analyst agent over this campaign's tracking results and
+    persists risk_level/vulnerability_summary/top_vulnerabilities/
+    recommended_training/departments_at_risk/immediate_actions into
+    agent_metadata.
+    """
+    campaign = await _get_campaign_or_404(campaign_id, current_user, db)
+    if campaign.state != CampaignState.DONE:
+        raise HTTPException(status_code=400, detail="Campaign must be DONE before it can be analysed")
+
+    stats = await _compute_stats(campaign_id, db)
+    campaign_results = {
+        "campaign_name": campaign.name,
+        "attack_vector": campaign.attack_vector,
+        "target_department": campaign.target_department,
+        "urgency_level": campaign.urgency_level,
+        "total_targets": stats.total_targets,
+        "emails_sent": stats.emails_sent,
+        "opened": stats.opened,
+        "clicked": stats.clicked,
+        "credentials_submitted": stats.credentials_submitted,
+        "reported": stats.reported,
+        "open_rate": stats.open_rate,
+        "click_rate": stats.click_rate,
+        "compromise_rate": stats.compromise_rate,
+    }
+
+    result: AgentState = await insight_pipeline.ainvoke({
+        "campaign_id": str(campaign_id),
+        "campaign_results": campaign_results,
+    })
+
+    insights = result.get("insights") or {}
+    if not insights:
+        raise HTTPException(status_code=502, detail=result.get("error") or "Insight analyst returned no result")
+
+    campaign.agent_metadata = {**(campaign.agent_metadata or {}), **insights}
+    await db.flush()
+    await db.refresh(campaign)
+    return campaign
 
 
 # ── Helper ────────────────────────────────────────────────────────────────

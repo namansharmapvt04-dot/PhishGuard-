@@ -21,7 +21,7 @@ export default function Modal({ open, title, onClose, children, footer }: ModalP
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       onMouseDown={onClose}
     >
       <div
@@ -29,8 +29,8 @@ export default function Modal({ open, title, onClose, children, footer }: ModalP
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white" aria-label="Close">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>

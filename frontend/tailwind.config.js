@@ -4,34 +4,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        // "navy" / "cyber" are the original token names from the app's first
-        // (blue) theme. Repointed here to the charcoal/ember industrial SOC
-        // palette — kept as-is rather than renamed so every existing
-        // `bg-navy-900` / `text-cyber-blue` class across the app picks up the
-        // new look automatically, with zero risk of a missed rename silently
-        // leaving some element unstyled.
+        // App-shell neutrals (light canvas + white cards), matching the
+        // design in github.com/pratham-vd/phishguard-frontend's styles.css.
+        // Kept under the original "navy" name so every existing `bg-navy-900`
+        // class across the app picks up the new look with zero renames.
         navy: {
-          950: '#0c0e10', // canvas
-          900: '#121415', // panel
-          800: '#1e2022', // tray / hover
-          700: '#282a2c', // hairline border
-          600: '#37393b', // bevel / disabled ring
+          950: '#f6f7f9', // app background (near-white)
+          900: '#ffffff', // card / panel surface
+          800: '#eef1f4', // muted surface / hover
+          700: '#e3e6eb', // hairline border
+          600: '#c7cdd6', // input border / ring
         },
+        // Brand accent — teal, matching the mockup's --primary / --sidebar-primary.
         cyber: {
-          blue: '#f9500c',  // primary action / active nav / brand (was blue, now ember)
-          cyan: '#ff7336',  // secondary / in-progress accent (was cyan, now ember-light)
-          green: '#10b981', // success — unchanged
-          red: '#ef4444',   // danger — unchanged
-          amber: '#f59e0b', // warning — unchanged
+          blue: '#0f766e',   // primary action / active nav / brand
+          cyan: '#14b8a6',   // secondary accent / links / in-progress
+          green: '#15803d',  // success — matches mockup's --success
+          red: '#dc2626',    // danger — matches mockup's --destructive
+          amber: '#d97706',  // warning — matches mockup's --warning
         },
+        // Dedicated dark sidebar palette (distinct from the light "navy"
+        // scale above — his design uses a dark sidebar over a light canvas).
+        sidebar: {
+          DEFAULT: '#1a2233',
+          foreground: '#e8edf5',
+          primary: '#14b8a6',
+          'primary-foreground': '#0b1f23',
+          accent: '#283046',
+          border: 'rgba(255,255,255,0.09)',
+        },
+        foreground: '#1e293b',
+        'muted-foreground': '#64748b',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-        display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['Manrope', '"DM Sans"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(249,80,12,0.3), 0 8px 30px rgba(249,80,12,0.15)',
+        glow: '0 0 0 1px rgba(15,118,110,0.25), 0 8px 24px rgba(15,118,110,0.12)',
       },
     },
   },
