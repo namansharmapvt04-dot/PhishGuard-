@@ -37,7 +37,7 @@ export default function EmailPreviewTab({ campaign }: { campaign: Campaign }) {
       <div className="card flex flex-col items-center gap-3 py-14 text-center text-slate-400">
         <Mail className="h-10 w-10 text-slate-600" />
         <div>
-          <p className="font-medium text-white">No email generated yet</p>
+          <p className="font-medium text-foreground">No email generated yet</p>
           <p className="text-sm text-slate-500">
             Run the pipeline in the “Generate” tab to produce a template.
           </p>
@@ -60,9 +60,9 @@ export default function EmailPreviewTab({ campaign }: { campaign: Campaign }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs uppercase tracking-wide text-slate-500">From</div>
-            <div className="text-sm text-slate-200">
+            <div className="text-sm text-foreground">
               {campaign.email_from_name || 'Unknown'}{' '}
-              <span className="text-slate-500">
+              <span className="text-muted-foreground">
                 &lt;{campaign.email_from_address || 'unknown@example.com'}&gt;
               </span>
             </div>
@@ -85,7 +85,7 @@ export default function EmailPreviewTab({ campaign }: { campaign: Campaign }) {
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-slate-500">Subject</div>
-          <div className="text-base font-semibold text-white">{subject}</div>
+          <div className="text-base font-semibold text-foreground">{subject}</div>
         </div>
       </div>
 

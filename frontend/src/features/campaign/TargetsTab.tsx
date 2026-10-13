@@ -113,8 +113,8 @@ export default function TargetsTab({
             <tbody>
               {targets.map((t: Target) => (
                 <tr key={t.id} className="hover:bg-navy-800/40">
-                  <td className="table-td font-medium text-white">{t.full_name}</td>
-                  <td className="table-td text-slate-300">{t.email}</td>
+                  <td className="table-td font-medium text-foreground">{t.full_name}</td>
+                  <td className="table-td text-foreground/80">{t.email}</td>
                   <td className="table-td text-slate-400">{t.department ?? '—'}</td>
                   <td className="table-td text-slate-400">{t.job_title ?? '—'}</td>
                   <td className="table-td">
@@ -125,7 +125,7 @@ export default function TargetsTab({
                   {editable && (
                     <td className="table-td text-right">
                       <button
-                        className="text-slate-500 hover:text-cyber-red"
+                        className="text-muted-foreground hover:text-cyber-red"
                         onClick={() => remove.mutate(t.id)}
                         aria-label="Remove target"
                       >

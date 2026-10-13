@@ -43,7 +43,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-slate-400">Your organisation's phishing-simulation overview</p>
         </div>
         <Link to="/campaigns" className="btn-primary">
@@ -65,7 +65,7 @@ export default function Dashboard() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Recent campaigns</h2>
+          <h2 className="text-lg font-semibold text-foreground">Recent campaigns</h2>
           <Link to="/campaigns" className="flex items-center gap-1 text-sm text-cyber-cyan hover:underline">
             View all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -119,7 +119,7 @@ function StatCard({
       <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
+      <div className="text-2xl font-bold text-foreground">{value}</div>
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
     </div>
   )
@@ -129,7 +129,7 @@ function RecentRow({ c }: { c: Campaign }) {
   return (
     <tr className="transition-colors hover:bg-navy-800/40">
       <td className="table-td">
-        <Link to={`/campaigns/${c.id}`} className="font-medium text-white hover:text-cyber-cyan">
+        <Link to={`/campaigns/${c.id}`} className="font-medium text-foreground hover:text-cyber-cyan">
           {c.name}
         </Link>
         {c.target_department && (
@@ -148,7 +148,7 @@ function EmptyState() {
     <div className="card flex flex-col items-center justify-center gap-3 py-14 text-center">
       <TargetIcon className="h-10 w-10 text-slate-600" />
       <div>
-        <p className="font-medium text-white">No campaigns yet</p>
+        <p className="font-medium text-foreground">No campaigns yet</p>
         <p className="text-sm text-slate-500">Create your first phishing-simulation campaign.</p>
       </div>
       <Link to="/campaigns" className="btn-primary">

@@ -60,7 +60,7 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
 
       <div className="card flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-white">Pause / resume</h3>
+          <h3 className="font-semibold text-foreground">Pause / resume</h3>
           <p className="text-sm text-slate-400">
             Only a running campaign can be paused; only a paused one can be resumed.
           </p>
@@ -86,10 +86,10 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
       <div className="card">
         <div className="mb-3 flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-cyber-cyan" />
-          <h3 className="font-semibold text-white">Schedule</h3>
+          <h3 className="font-semibold text-foreground">Schedule</h3>
         </div>
         <p className="mb-3 text-sm text-slate-400">
-          Current: <span className="text-slate-200">{formatDate(campaign.scheduled_at)}</span>
+          Current: <span className="text-foreground">{formatDate(campaign.scheduled_at)}</span>
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
@@ -120,7 +120,7 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
       <div className="card border-cyber-red/30">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-white">Delete campaign</h3>
+            <h3 className="font-semibold text-foreground">Delete campaign</h3>
             <p className="text-sm text-slate-400">
               Permanently removes the campaign, its targets and tracking data.
             </p>

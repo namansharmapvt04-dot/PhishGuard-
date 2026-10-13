@@ -33,7 +33,7 @@ export default function OverviewTab({ campaign }: { campaign: Campaign }) {
     <div className="space-y-6">
       <div className="card">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-semibold text-white">Details</h3>
+          <h3 className="font-semibold text-foreground">Details</h3>
           {canEdit && !editing && (
             <button className="btn-ghost" onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" /> Edit
@@ -103,7 +103,7 @@ export default function OverviewTab({ campaign }: { campaign: Campaign }) {
 
       {meta && (meta.plan_reasoning || meta.fear_factor || meta.urgency_trigger) && (
         <div className="card">
-          <h3 className="mb-4 font-semibold text-white">AI strategy</h3>
+          <h3 className="mb-4 font-semibold text-foreground">AI strategy</h3>
           <dl className="space-y-4">
             {meta.plan_reasoning && <Field label="Plan reasoning" value={meta.plan_reasoning} span />}
             <div className="grid grid-cols-2 gap-4">
@@ -138,7 +138,7 @@ function Field({
     <div className={span ? 'col-span-2 sm:col-span-3' : ''}>
       <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
       <dd
-        className={`mt-1 text-sm text-slate-200 ${mono ? 'font-mono' : ''} ${
+        className={`mt-1 text-sm text-foreground ${mono ? 'font-mono' : ''} ${
           capitalize ? 'capitalize' : ''
         }`}
       >

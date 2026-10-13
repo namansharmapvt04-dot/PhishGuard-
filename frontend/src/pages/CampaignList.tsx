@@ -41,7 +41,7 @@ export default function CampaignList() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Campaigns</h1>
+          <h1 className="text-2xl font-bold text-foreground">Campaigns</h1>
           <p className="text-sm text-slate-400">Create and manage phishing-simulation campaigns</p>
         </div>
         <button className="btn-primary" onClick={() => setModalOpen(true)}>
@@ -57,7 +57,7 @@ export default function CampaignList() {
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               filter === f.key
                 ? 'bg-cyber-blue/15 text-cyber-blue'
-                : 'text-slate-400 hover:bg-navy-800/60 hover:text-white'
+                : 'text-muted-foreground hover:bg-navy-800 hover:text-foreground'
             }`}
           >
             {f.label}
@@ -107,7 +107,7 @@ function Row({ c, onClick }: { c: Campaign; onClick: () => void }) {
       className="cursor-pointer transition-colors hover:bg-navy-800/40"
     >
       <td className="table-td">
-        <div className="font-medium text-white">{c.name}</div>
+        <div className="font-medium text-foreground">{c.name}</div>
         {c.target_department && (
           <div className="text-xs text-slate-500">{c.target_department}</div>
         )}

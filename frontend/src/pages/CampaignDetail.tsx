@@ -42,14 +42,14 @@ export default function CampaignDetail() {
     <div className="space-y-6">
       <Link
         to="/campaigns"
-        className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Campaigns
       </Link>
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-white">{campaign.name}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{campaign.name}</h1>
           <StateBadge state={campaign.state} />
         </div>
         {campaign.state === 'DONE' && (
@@ -67,7 +67,7 @@ export default function CampaignDetail() {
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === t.key
                 ? 'border-cyber-blue text-cyber-blue'
-                : 'border-transparent text-slate-400 hover:text-white'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {t.label}

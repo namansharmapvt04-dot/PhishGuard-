@@ -21,11 +21,11 @@ import { apiError } from '../api/client'
 import { formatDate, formatPercent } from '../lib/format'
 
 const OUTCOME_COLORS = {
-  opened: '#f9500c',
-  clicked: '#ff7336',
-  submitted: '#ef4444',
-  reported: '#10b981',
-  none: '#5c6066',
+  opened: '#14b8a6',
+  clicked: '#d97706',
+  submitted: '#dc2626',
+  reported: '#15803d',
+  none: '#c7cdd6',
 }
 
 const RISK_BADGE: Record<string, string> = {
@@ -76,14 +76,14 @@ export default function Results() {
     <div className="space-y-6">
       <Link
         to={`/campaigns/${id}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back to campaign
       </Link>
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">{campaign.name} — Results</h1>
+          <h1 className="text-2xl font-bold text-foreground">{campaign.name} — Results</h1>
           <p className="text-sm text-slate-400">Completed {formatDate(campaign.completed_at)}</p>
         </div>
         <button
@@ -105,20 +105,20 @@ export default function Results() {
 
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="card">
-          <h3 className="mb-4 font-semibold text-white">Outcomes by target</h3>
+          <h3 className="mb-4 font-semibold text-foreground">Outcomes by target</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={outcomeData} margin={{ top: 4, right: 8, bottom: 4, left: -16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#282a2c" />
-              <XAxis dataKey="name" tick={{ fill: '#9da3ae', fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fill: '#9da3ae', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e3e6eb" />
+              <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
-                  background: '#121415',
-                  border: '1px solid #282a2c',
+                  background: '#ffffff',
+                  border: '1px solid #e3e6eb',
                   borderRadius: 8,
-                  color: '#e2e8f0',
+                  color: '#1e293b',
                 }}
-                cursor={{ fill: 'rgba(249,80,12,0.08)' }}
+                cursor={{ fill: 'rgba(15,118,110,0.08)' }}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                 {outcomeData.map((d) => (
@@ -130,27 +130,27 @@ export default function Results() {
         </div>
 
         <div className="card">
-          <h3 className="mb-4 font-semibold text-white">First interactions over time</h3>
+          <h3 className="mb-4 font-semibold text-foreground">First interactions over time</h3>
           {timeline.length > 1 ? (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={timeline} margin={{ top: 4, right: 8, bottom: 4, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#282a2c" />
-                <XAxis dataKey="label" tick={{ fill: '#9da3ae', fontSize: 12 }} />
-                <YAxis allowDecimals={false} tick={{ fill: '#9da3ae', fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e3e6eb" />
+                <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
-                    background: '#121415',
-                    border: '1px solid #282a2c',
+                    background: '#ffffff',
+                    border: '1px solid #e3e6eb',
                     borderRadius: 8,
-                    color: '#e2e8f0',
+                    color: '#1e293b',
                   }}
                 />
                 <Line
                   type="monotone"
                   dataKey="cumulative"
-                  stroke="#f9500c"
+                  stroke="#0f766e"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: '#f9500c' }}
+                  dot={{ r: 3, fill: '#0f766e' }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -168,11 +168,11 @@ export default function Results() {
           <div className="card">
             <div className="mb-3 flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-cyber-red" />
-              <h3 className="font-semibold text-white">Risk assessment</h3>
+              <h3 className="font-semibold text-foreground">Risk assessment</h3>
               <span className={`${RISK_BADGE[risk] ?? 'badge-gray'} ml-auto capitalize`}>{risk}</span>
             </div>
             {meta?.vulnerability_summary && (
-              <p className="mb-3 text-sm text-slate-300">{meta.vulnerability_summary}</p>
+              <p className="mb-3 text-sm text-foreground/90">{meta.vulnerability_summary}</p>
             )}
             {meta?.top_vulnerabilities?.length ? (
               <ul className="list-inside list-disc space-y-1 text-sm text-slate-400">
@@ -186,14 +186,14 @@ export default function Results() {
           <div className="card">
             <div className="mb-3 flex items-center gap-2">
               <GraduationCap className="h-4 w-4 text-cyber-cyan" />
-              <h3 className="font-semibold text-white">Recommended training</h3>
+              <h3 className="font-semibold text-foreground">Recommended training</h3>
             </div>
             {meta?.recommended_training?.length ? (
               <ul className="space-y-2">
                 {meta.recommended_training.map((t, i) => (
                   <li key={i} className="rounded-lg border border-navy-700 bg-navy-950/40 p-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">{t.topic}</span>
+                      <span className="text-sm font-medium text-foreground">{t.topic}</span>
                       <span className="badge-gray capitalize">{t.priority}</span>
                     </div>
                     <p className="mt-1 text-xs text-slate-400">{t.rationale}</p>
@@ -215,7 +215,7 @@ export default function Results() {
       {/* Per-target activity */}
       <section className="card overflow-hidden p-0">
         <div className="border-b border-navy-800 px-4 py-3">
-          <h3 className="font-semibold text-white">Target activity</h3>
+          <h3 className="font-semibold text-foreground">Target activity</h3>
         </div>
         {activityQ.isLoading ? (
           <div className="p-6">
@@ -239,7 +239,7 @@ export default function Results() {
               {activityQ.data!.map((a) => (
                 <tr key={a.target_id} className="hover:bg-navy-800/40">
                   <td className="table-td">
-                    <div className="font-medium text-white">{a.full_name}</div>
+                    <div className="font-medium text-foreground">{a.full_name}</div>
                     <div className="text-xs text-slate-500">{a.email}</div>
                   </td>
                   <Check on={a.opened} />
@@ -267,7 +267,7 @@ function Tile({
   tone?: 'blue' | 'cyan' | 'amber' | 'red'
 }) {
   const color = {
-    blue: 'text-white',
+    blue: 'text-foreground',
     cyan: 'text-cyber-cyan',
     amber: 'text-cyber-amber',
     red: 'text-cyber-red',
