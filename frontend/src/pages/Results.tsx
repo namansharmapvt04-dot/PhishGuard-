@@ -21,11 +21,11 @@ import { apiError } from '../api/client'
 import { formatDate, formatPercent } from '../lib/format'
 
 const OUTCOME_COLORS = {
-  opened: '#06b6d4',
-  clicked: '#f59e0b',
+  opened: '#f9500c',
+  clicked: '#ff7336',
   submitted: '#ef4444',
   reported: '#10b981',
-  none: '#475569',
+  none: '#5c6066',
 }
 
 const RISK_BADGE: Record<string, string> = {
@@ -108,17 +108,17 @@ export default function Results() {
           <h3 className="mb-4 font-semibold text-white">Outcomes by target</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={outcomeData} margin={{ top: 4, right: 8, bottom: 4, left: -16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#162d57" />
-              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#282a2c" />
+              <XAxis dataKey="name" tick={{ fill: '#9da3ae', fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fill: '#9da3ae', fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
-                  background: '#0a1628',
-                  border: '1px solid #162d57',
+                  background: '#121415',
+                  border: '1px solid #282a2c',
                   borderRadius: 8,
                   color: '#e2e8f0',
                 }}
-                cursor={{ fill: 'rgba(59,130,246,0.08)' }}
+                cursor={{ fill: 'rgba(249,80,12,0.08)' }}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                 {outcomeData.map((d) => (
@@ -134,13 +134,13 @@ export default function Results() {
           {timeline.length > 1 ? (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={timeline} margin={{ top: 4, right: 8, bottom: 4, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#162d57" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#282a2c" />
+                <XAxis dataKey="label" tick={{ fill: '#9da3ae', fontSize: 12 }} />
+                <YAxis allowDecimals={false} tick={{ fill: '#9da3ae', fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
-                    background: '#0a1628',
-                    border: '1px solid #162d57',
+                    background: '#121415',
+                    border: '1px solid #282a2c',
                     borderRadius: 8,
                     color: '#e2e8f0',
                   }}
@@ -148,9 +148,9 @@ export default function Results() {
                 <Line
                   type="monotone"
                   dataKey="cumulative"
-                  stroke="#3b82f6"
+                  stroke="#f9500c"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: '#3b82f6' }}
+                  dot={{ r: 3, fill: '#f9500c' }}
                 />
               </LineChart>
             </ResponsiveContainer>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,16 +13,20 @@
 
   body {
     @apply bg-navy-950 text-slate-200 font-sans antialiased;
-    /* subtle cyber grid */
+    /* neutral industrial grid — charcoal, not tinted */
     background-image:
-      linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+      linear-gradient(rgba(42, 45, 48, 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 45, 48, 0.5) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Space Grotesk', theme('fontFamily.sans');
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #162d57 transparent;
+    scrollbar-color: #282a2c transparent;
   }
   *::-webkit-scrollbar {
     width: 8px;
@@ -30,6 +34,9 @@
   }
   *::-webkit-scrollbar-thumb {
     @apply bg-navy-700 rounded-full;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    @apply bg-cyber-blue/60;
   }
 }
 
