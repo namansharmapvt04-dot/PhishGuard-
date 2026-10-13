@@ -104,4 +104,4 @@ if __name__ == "__main__":
     print(f"Seeding {len(PHISHING_PATTERNS)} phishing patterns into ChromaDB...")
     count = upsert_patterns(PHISHING_PATTERNS)
     total = collection_count()
-    print(f"✓ Seeded {count} patterns. Collection now has {total} total patterns.")
+    print(f"[OK] Seeded {count} patterns. Collection now has {total} total patterns.")

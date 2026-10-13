@@ -7,8 +7,8 @@ const MAP: Record<CampaignState, { cls: string; label: string }> = {
   ESCALATED: { cls: 'badge-red', label: 'Escalated' },
   SCHEDULED: { cls: 'badge-amber', label: 'Scheduled' },
   RUNNING: { cls: 'badge-green', label: 'Running' },
-  PAUSED: { cls: 'badge-amber', label: 'Paused' },
-  DONE: { cls: 'badge-blue', label: 'Done' },
+  PAUSED: { cls: 'badge-gray', label: 'Paused' },
+  DONE: { cls: 'badge-green', label: 'Done' },
 }
 
 export default function StateBadge({ state }: { state: CampaignState }) {

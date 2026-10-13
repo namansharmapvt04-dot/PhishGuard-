@@ -2,18 +2,21 @@
 ChromaDB vector store for phishing patterns.
 Provides semantic retrieval of similar phishing templates.
 """
+from __future__ import annotations
+from typing import Optional
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
 from app.config import settings
 
-_chroma_client: chromadb.PersistentClient | None = None
-_embedding_model: SentenceTransformer | None = None
+_chroma_client: Optional[chromadb.Client] = None
+_embedding_model: Optional[SentenceTransformer] = None
 _collection = None
 
 
-def _get_client() -> chromadb.PersistentClient:
+def _get_client() -> chromadb.Client:
     global _chroma_client
     if _chroma_client is None:
         _chroma_client = chromadb.PersistentClient(
@@ -47,7 +50,7 @@ def embed(texts: list[str]) -> list[list[float]]:
     return model.encode(texts, convert_to_numpy=True).tolist()
 
 
-def retrieve_patterns(query: str, k: int | None = None) -> list[dict]:
+def retrieve_patterns(query: str, k: Optional[int] = None) -> list[dict]:
     """
     Retrieve the top-k most similar phishing patterns for a given query.
     Returns list of dicts with keys: id, document, metadata, distance.
