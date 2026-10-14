@@ -66,6 +66,13 @@ export interface CampaignUpdate {
   scheduled_at?: string | null
 }
 
+export interface LaunchResult {
+  sent: number
+  failed: number
+  remaining_pending: number
+  message: string | null
+}
+
 export interface CampaignStats {
   campaign_id: string
   total_targets: number
@@ -125,6 +132,11 @@ export const campaignsApi = {
   async analyse(id: string): Promise<Campaign> {
     if (isDemo()) return demoApi.getCampaign(id)
     const { data } = await api.post<Campaign>(`/campaigns/${id}/analyse`)
+    return data
+  },
+  async launch(id: string): Promise<LaunchResult> {
+    if (isDemo()) return { sent: 0, failed: 0, remaining_pending: 0, message: 'Demo mode does not send real email.' }
+    const { data } = await api.post<LaunchResult>(`/campaigns/${id}/launch`)
     return data
   },
 }

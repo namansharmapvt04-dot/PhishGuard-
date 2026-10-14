@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pause, Play, CalendarClock, Trash2, AlertCircle } from 'lucide-react'
-import { campaignsApi, Campaign } from '../../api/campaigns'
+import { Send, Pause, Play, CalendarClock, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { campaignsApi, Campaign, LaunchResult } from '../../api/campaigns'
 import { apiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
 
@@ -11,6 +11,7 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [launchResult, setLaunchResult] = useState<LaunchResult | null>(null)
   const [scheduleAt, setScheduleAt] = useState(
     campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
   )
@@ -20,6 +21,14 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
     qc.invalidateQueries({ queryKey: ['campaigns'] })
   }
 
+  const launch = useMutation({
+    mutationFn: () => campaignsApi.launch(campaign.id),
+    onSuccess: (result) => {
+      setLaunchResult(result)
+      invalidate()
+    },
+    onError: (e) => setError(apiError(e, 'Could not launch')),
+  })
   const pause = useMutation({
     mutationFn: () => campaignsApi.pause(campaign.id),
     onSuccess: invalidate,
@@ -57,6 +66,40 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
           <span>{error}</span>
         </div>
       )}
+
+      <div className="card">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="flex items-center gap-2 font-semibold text-foreground">
+              <Send className="h-4 w-4 text-cyber-blue" /> Launch campaign
+            </h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Sends the generated email to every pending target via Brevo. Throttled to the
+              free-tier daily cap — call again later if some targets are deferred.
+            </p>
+          </div>
+          <button
+            className="btn-primary shrink-0"
+            disabled={!['READY', 'SCHEDULED', 'RUNNING'].includes(campaign.state) || launch.isPending}
+            onClick={() => {
+              setLaunchResult(null)
+              launch.mutate()
+            }}
+          >
+            <Send className="h-4 w-4" /> {launch.isPending ? 'Sending…' : 'Launch now'}
+          </button>
+        </div>
+        {launchResult && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-cyber-green/30 bg-cyber-green/10 px-3 py-2 text-sm text-cyber-green">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Sent {launchResult.sent}, failed {launchResult.failed}
+              {launchResult.remaining_pending > 0 && `, ${launchResult.remaining_pending} still pending`}.
+              {launchResult.message && <> {launchResult.message}</>}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="card flex items-center justify-between">
         <div>

@@ -9,12 +9,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 import structlog
 
-from app.dependencies import CurrentUser, DB
+from app.config import settings
+from app.database import AsyncSessionLocal
+from app.dependencies import CurrentUser, DB, Redis
 from app.models.campaign import Campaign, CampaignState
+from app.models.target import Target, TargetStatus
 from app.models.tracking import TrackingEvent, EventType
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut, CampaignStats
 from app.agents import generation_pipeline, insight_pipeline, AgentState
 from app.core.sse import sse_format, SSEEvent
+from app.core.mailer import send_email, inject_tracking, MailerNotConfigured, MailerError
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -89,12 +93,16 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     if campaign.state not in (CampaignState.DRAFT, CampaignState.ESCALATED):
         raise HTTPException(status_code=400, detail=f"Cannot generate in state: {campaign.state}")
 
+    # organization is a lazy relationship — load it before touching it below,
+    # same pattern used in auth.me / register (async lazy-load needs an
+    # explicit refresh; a bare attribute access raises MissingGreenlet).
+    await db.refresh(current_user, ["organization"])
+
     # Transition to GENERATING immediately
     campaign.state = CampaignState.GENERATING
     await db.flush()
 
     # Gather targets for personalisation
-    from app.models.target import Target
     targets_result = await db.execute(
         select(Target).where(Target.campaign_id == campaign_id)
     )
@@ -125,54 +133,167 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     async def event_stream():
         yield sse_format(SSEEvent.PIPELINE_STARTED, {"campaign_id": str(campaign_id)})
 
-        try:
-            async for chunk in generation_pipeline.astream(initial_state):
-                node_name = list(chunk.keys())[0] if chunk else None
-                if node_name:
-                    node_state = chunk[node_name]
-                    yield sse_format(SSEEvent.NODE_COMPLETED, {
-                        "node": node_name,
-                        "ragas_score": node_state.get("ragas_score"),
-                        "retry_count": node_state.get("retry_count", 0),
-                        "eval_passed": node_state.get("eval_passed"),
+        # FastAPI closes the `db` session (the Depends(DB) one above) as soon as
+        # this endpoint function returns the StreamingResponse object — before
+        # this generator body ever runs. Writing through that `db`/`campaign`
+        # later silently no-ops (the session is detached, so commit() has
+        # nothing pending). Open a dedicated session here instead, scoped to
+        # just this generator's lifetime, for every write below.
+        async with AsyncSessionLocal() as write_db:
+            try:
+                async for chunk in generation_pipeline.astream(initial_state):
+                    node_name = list(chunk.keys())[0] if chunk else None
+                    if node_name:
+                        node_state = chunk[node_name]
+                        yield sse_format(SSEEvent.NODE_COMPLETED, {
+                            "node": node_name,
+                            "ragas_score": node_state.get("ragas_score"),
+                            "retry_count": node_state.get("retry_count", 0),
+                            "eval_passed": node_state.get("eval_passed"),
+                        })
+
+                # After pipeline: persist results
+                final_state = node_state  # last chunk state
+                write_campaign = await write_db.get(Campaign, campaign_id)
+                if final_state.get("should_escalate"):
+                    write_campaign.state = CampaignState.ESCALATED
+                    yield sse_format(SSEEvent.STATE_CHANGED, {"state": "ESCALATED"})
+                else:
+                    write_campaign.email_subject = final_state.get("email_subject")
+                    write_campaign.email_body = final_state.get("email_body")
+                    write_campaign.email_from_name = final_state.get("sender_name")
+                    write_campaign.email_from_address = final_state.get("sender_email")
+                    write_campaign.sender_persona = final_state.get("sender_persona")
+                    write_campaign.ragas_score = final_state.get("ragas_score")
+                    write_campaign.retry_count = final_state.get("retry_count", 0)
+                    write_campaign.agent_metadata = {
+                        "plan_reasoning": final_state.get("plan_reasoning"),
+                        "fear_factor": final_state.get("fear_factor"),
+                        "urgency_trigger": final_state.get("urgency_trigger"),
+                        "eval_feedback": final_state.get("eval_feedback"),
+                        "rag_pattern_count": len(final_state.get("rag_patterns", [])),
+                    }
+                    write_campaign.state = CampaignState.READY
+
+                    # Persist each target's personalised content (the
+                    # Personalisation Agent already produced it in
+                    # final_state, but nothing wrote it to the target
+                    # rows — /launch needs it there to actually send).
+                    personalised = final_state.get("personalised_emails", {})
+                    for target_id, content in personalised.items():
+                        try:
+                            target_uuid = uuid.UUID(target_id)
+                        except ValueError:
+                            continue
+                        target_row = await write_db.get(Target, target_uuid)
+                        if target_row:
+                            target_row.personalised_subject = content.get("subject")
+                            target_row.personalised_body = content.get("body")
+
+                    yield sse_format(SSEEvent.STATE_CHANGED, {"state": "READY"})
+                    yield sse_format(SSEEvent.PIPELINE_COMPLETED, {
+                        "ragas_score": write_campaign.ragas_score,
+                        "subject": write_campaign.email_subject,
                     })
 
-            # After pipeline: persist results
-            final_state = node_state  # last chunk state
-            if final_state.get("should_escalate"):
-                campaign.state = CampaignState.ESCALATED
-                yield sse_format(SSEEvent.STATE_CHANGED, {"state": "ESCALATED"})
-            else:
-                campaign.email_subject = final_state.get("email_subject")
-                campaign.email_body = final_state.get("email_body")
-                campaign.email_from_name = final_state.get("sender_name")
-                campaign.email_from_address = final_state.get("sender_email")
-                campaign.sender_persona = final_state.get("sender_persona")
-                campaign.ragas_score = final_state.get("ragas_score")
-                campaign.retry_count = final_state.get("retry_count", 0)
-                campaign.agent_metadata = {
-                    "plan_reasoning": final_state.get("plan_reasoning"),
-                    "fear_factor": final_state.get("fear_factor"),
-                    "urgency_trigger": final_state.get("urgency_trigger"),
-                    "eval_feedback": final_state.get("eval_feedback"),
-                    "rag_pattern_count": len(final_state.get("rag_patterns", [])),
-                }
-                campaign.state = CampaignState.READY
-                yield sse_format(SSEEvent.STATE_CHANGED, {"state": "READY"})
-                yield sse_format(SSEEvent.PIPELINE_COMPLETED, {
-                    "ragas_score": campaign.ragas_score,
-                    "subject": campaign.email_subject,
-                })
+                await write_db.commit()
 
-            await db.commit()
-
-        except Exception as e:
-            log.error("generate.stream_error", error=str(e))
-            campaign.state = CampaignState.ESCALATED
-            await db.commit()
-            yield sse_format(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
+            except Exception as e:
+                log.error("generate.stream_error", error=str(e))
+                await write_db.rollback()
+                write_campaign = await write_db.get(Campaign, campaign_id)
+                write_campaign.state = CampaignState.ESCALATED
+                await write_db.commit()
+                yield sse_format(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ── Launch (actually send the emails) ────────────────────────────────────────
+
+async def _reserve_quota(redis: Redis, count: int) -> int:
+    """
+    Atomically reserves up to `count` sends against today's Brevo free-tier
+    daily cap, tracked in Redis (keyed by UTC date, auto-expires next day).
+    Returns how many were actually reserved (may be less than `count`, or 0).
+    """
+    key = f"email_quota:{datetime.now(timezone.utc).date().isoformat()}"
+    used = await redis.incrby(key, count)
+    await redis.expire(key, 90000)  # ~25h, so it always outlives "today"
+    if used > settings.BREVO_DAILY_LIMIT:
+        over = used - settings.BREVO_DAILY_LIMIT
+        reserved = count - over
+        await redis.decrby(key, over)  # give back what we couldn't use
+        return max(0, reserved)
+    return count
+
+
+@router.post("/{campaign_id}/launch")
+async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
+    """
+    Sends the generated, personalised email to every PENDING target via
+    Brevo, throttled to the free-tier daily cap. Safe to call again later
+    (e.g. the next day) to keep working through a target list bigger than
+    one day's quota — already-SENT targets are skipped.
+    """
+    campaign = await _get_campaign_or_404(campaign_id, current_user, db)
+    if campaign.state not in (CampaignState.READY, CampaignState.SCHEDULED, CampaignState.RUNNING):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot launch from state: {campaign.state}. Generate the email first.",
+        )
+    if not campaign.email_subject or not campaign.email_body:
+        raise HTTPException(status_code=400, detail="No generated email to send — run Generate first")
+
+    pending_result = await db.execute(
+        select(Target).where(Target.campaign_id == campaign_id, Target.status == TargetStatus.PENDING)
+    )
+    pending = pending_result.scalars().all()
+    if not pending:
+        return {"sent": 0, "failed": 0, "remaining_pending": 0, "message": "No pending targets to send to."}
+
+    reserved = await _reserve_quota(redis, len(pending))
+    to_send, to_defer = pending[:reserved], pending[reserved:]
+
+    sent = failed = 0
+    for target in to_send:
+        subject = target.personalised_subject or campaign.email_subject
+        body = target.personalised_body or campaign.email_body
+        tracked_body = inject_tracking(body, settings.BASE_URL, target.tracking_token)
+        try:
+            await send_email(
+                to_email=target.email,
+                to_name=target.full_name,
+                subject=subject,
+                html_body=tracked_body,
+                sender_name=campaign.email_from_name,
+            )
+            target.status = TargetStatus.SENT
+            target.sent_at = datetime.now(timezone.utc)
+            sent += 1
+        except (MailerNotConfigured, MailerError) as e:
+            target.status = TargetStatus.FAILED
+            target.failed_reason = str(e)[:500]
+            failed += 1
+
+    if campaign.state != CampaignState.RUNNING:
+        campaign.state = CampaignState.RUNNING
+        campaign.started_at = campaign.started_at or datetime.now(timezone.utc)
+
+    await db.flush()
+
+    message = None
+    if to_defer:
+        message = (
+            f"Hit today's sending limit — {len(to_defer)} target(s) still PENDING. "
+            "Call launch again tomorrow (or once quota resets) to continue."
+        )
+    return {
+        "sent": sent,
+        "failed": failed,
+        "remaining_pending": len(to_defer),
+        "message": message,
+    }
 
 
 # ── Campaign control ─────────────────────────────────────────────────────────

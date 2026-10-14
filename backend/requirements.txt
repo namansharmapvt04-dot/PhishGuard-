@@ -13,6 +13,9 @@ greenlet==3.0.3
 # ── Auth ───────────────────────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+# passlib 1.7.4's backend self-test raises on bcrypt>=4.1 (ValueError: password
+# cannot be longer than 72 bytes) — pin below that until passlib is updated/replaced.
+bcrypt==4.0.1
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 pydantic==2.7.4

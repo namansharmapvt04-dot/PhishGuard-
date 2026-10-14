@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
+    # Email sending (Brevo transactional API)
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
+    BREVO_DAILY_LIMIT: int = 300
+
     # App
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"

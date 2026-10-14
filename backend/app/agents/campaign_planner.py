@@ -51,11 +51,13 @@ def _get_llm(fallback: bool = False):
             model=settings.FALLBACK_MODEL,
             api_key=settings.OPENAI_API_KEY,
             temperature=0.7,
+            request_timeout=30,
         )
     return ChatGroq(
         model=settings.PRIMARY_MODEL,
         api_key=settings.GROQ_API_KEY,
         temperature=0.7,
+        request_timeout=30,
     )
 
 

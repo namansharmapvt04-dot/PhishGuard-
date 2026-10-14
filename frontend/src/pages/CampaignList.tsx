@@ -8,6 +8,7 @@ import Spinner from '../components/Spinner'
 import Modal from '../components/Modal'
 import { formatDateShort, formatScore } from '../lib/format'
 import { apiError } from '../api/client'
+import { DEPARTMENTS, ATTACK_VECTORS } from '../lib/constants'
 
 type Filter = 'all' | 'active' | 'done' | 'escalated'
 
@@ -218,12 +219,18 @@ function CreateCampaignModal({ open, onClose }: { open: boolean; onClose: () => 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Target department</label>
-            <input
+            <select
               className="input"
-              placeholder="Finance"
               value={form.target_department ?? ''}
               onChange={(e) => set('target_department', e.target.value)}
-            />
+            >
+              <option value="">Select a department…</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="label">Urgency</label>
@@ -239,12 +246,18 @@ function CreateCampaignModal({ open, onClose }: { open: boolean; onClose: () => 
           </div>
           <div className="col-span-2">
             <label className="label">Attack vector</label>
-            <input
+            <select
               className="input"
-              placeholder="credential harvesting"
               value={form.attack_vector ?? ''}
               onChange={(e) => set('attack_vector', e.target.value)}
-            />
+            >
+              <option value="">Select an attack vector…</option>
+              {ATTACK_VECTORS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </form>
