@@ -40,8 +40,8 @@ Output ONLY:
 
 def _get_llm(fallback: bool = False):
     if fallback or not settings.GROQ_API_KEY:
-        return ChatOpenAI(model=settings.FALLBACK_MODEL, api_key=settings.OPENAI_API_KEY, temperature=0.4)
-    return ChatGroq(model=settings.PRIMARY_MODEL, api_key=settings.GROQ_API_KEY, temperature=0.4)
+        return ChatOpenAI(model=settings.FALLBACK_MODEL, api_key=settings.OPENAI_API_KEY, temperature=0.4, request_timeout=30)
+    return ChatGroq(model=settings.PRIMARY_MODEL, api_key=settings.GROQ_API_KEY, temperature=0.4, request_timeout=30)
 
 
 async def insight_analyst_node(state: AgentState) -> AgentState:

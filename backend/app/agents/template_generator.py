@@ -56,8 +56,8 @@ def _format_rag_examples(patterns: list[dict]) -> str:
 
 def _get_llm(fallback: bool = False):
     if fallback or not settings.GROQ_API_KEY:
-        return ChatOpenAI(model=settings.FALLBACK_MODEL, api_key=settings.OPENAI_API_KEY, temperature=0.8)
-    return ChatGroq(model=settings.PRIMARY_MODEL, api_key=settings.GROQ_API_KEY, temperature=0.8)
+        return ChatOpenAI(model=settings.FALLBACK_MODEL, api_key=settings.OPENAI_API_KEY, temperature=0.8, request_timeout=30)
+    return ChatGroq(model=settings.PRIMARY_MODEL, api_key=settings.GROQ_API_KEY, temperature=0.8, request_timeout=30)
 
 
 async def template_generator_node(state: AgentState) -> AgentState:
