@@ -7,13 +7,17 @@ from typing import Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from sentence_transformers import SentenceTransformer
+from chromadb.utils import embedding_functions
 
 from app.config import settings
 
 _chroma_client: Optional[chromadb.Client] = None
-_embedding_model: Optional[SentenceTransformer] = None
 _collection = None
+
+# ONNX MiniLM via onnxruntime — same model family as sentence-transformers'
+# all-MiniLM-L6-v2, but without pulling in torch (~300-700MB resident just on
+# import, which alone blew past Render free tier's 512MB RAM cap).
+_embedding_fn = embedding_functions.DefaultEmbeddingFunction()
 
 
 def _get_client() -> chromadb.Client:
@@ -26,14 +30,6 @@ def _get_client() -> chromadb.Client:
     return _chroma_client
 
 
-def _get_embedding_model() -> SentenceTransformer:
-    global _embedding_model
-    if _embedding_model is None:
-        # all-MiniLM-L6-v2 runs on CPU, fast, ~80MB
-        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embedding_model
-
-
 def _get_collection():
     global _collection
     if _collection is None:
@@ -41,13 +37,9 @@ def _get_collection():
         _collection = client.get_or_create_collection(
             name=settings.CHROMA_COLLECTION,
             metadata={"hnsw:space": "cosine"},
+            embedding_function=_embedding_fn,
         )
     return _collection
-
-
-def embed(texts: list[str]) -> list[list[float]]:
-    model = _get_embedding_model()
-    return model.encode(texts, convert_to_numpy=True).tolist()
 
 
 def retrieve_patterns(query: str, k: Optional[int] = None) -> list[dict]:
@@ -58,9 +50,8 @@ def retrieve_patterns(query: str, k: Optional[int] = None) -> list[dict]:
     k = k or settings.RAG_TOP_K
     collection = _get_collection()
 
-    query_embedding = embed([query])[0]
     results = collection.query(
-        query_embeddings=[query_embedding],
+        query_texts=[query],
         n_results=k,
         include=["documents", "metadatas", "distances"],
     )
@@ -86,13 +77,13 @@ def upsert_patterns(patterns: list[dict]) -> int:
     ids = [p["id"] for p in patterns]
     documents = [p["text"] for p in patterns]
     metadatas = [p.get("metadata", {}) for p in patterns]
-    embeddings = embed(documents)
 
+    # No explicit `embeddings=` — the collection's embedding_function (set in
+    # _get_collection) computes them from `documents` automatically.
     collection.upsert(
         ids=ids,
         documents=documents,
         metadatas=metadatas,
-        embeddings=embeddings,
     )
     return len(patterns)
 
