@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send, Pause, Play, CalendarClock, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Send, Pause, Play, CalendarClock, Trash2, AlertCircle, CheckCircle2, BarChart3, Flag } from 'lucide-react'
 import { campaignsApi, Campaign, LaunchResult } from '../../api/campaigns'
 import { apiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
@@ -38,6 +38,14 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
     mutationFn: () => campaignsApi.resume(campaign.id),
     onSuccess: invalidate,
     onError: (e) => setError(apiError(e, 'Could not resume')),
+  })
+  const complete = useMutation({
+    mutationFn: () => campaignsApi.complete(campaign.id),
+    onSuccess: () => {
+      invalidate()
+      navigate(`/campaigns/${campaign.id}/results`)
+    },
+    onError: (e) => setError(apiError(e, 'Could not mark complete')),
   })
   const schedule = useMutation({
     mutationFn: () =>
@@ -123,6 +131,31 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
           >
             <Play className="h-4 w-4" /> Resume
           </button>
+        </div>
+      </div>
+
+      <div className="card flex items-center justify-between">
+        <div>
+          <h3 className="flex items-center gap-2 font-semibold text-foreground">
+            <BarChart3 className="h-4 w-4 text-cyber-cyan" /> Monitoring
+          </h3>
+          <p className="text-sm text-slate-400">
+            {['RUNNING', 'PAUSED', 'DONE'].includes(campaign.state)
+              ? 'Open rate, click rate, submissions and reports update live as targets interact with the email.'
+              : 'Available once the campaign is launched.'}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {['RUNNING', 'PAUSED', 'DONE'].includes(campaign.state) && (
+            <button className="btn-ghost" onClick={() => navigate(`/campaigns/${campaign.id}/results`)}>
+              <BarChart3 className="h-4 w-4" /> View results
+            </button>
+          )}
+          {['RUNNING', 'PAUSED'].includes(campaign.state) && (
+            <button className="btn-primary" disabled={complete.isPending} onClick={() => complete.mutate()}>
+              <Flag className="h-4 w-4" /> {complete.isPending ? 'Closing…' : 'Mark complete'}
+            </button>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,7 @@ Node 4 — Personalisation Agent
 Injects target-specific variables into the approved email template.
 Uses Personalisation / Variable Injection prompting.
 """
+import asyncio
 import structlog
 
 from langchain_groq import ChatGroq
@@ -95,7 +96,7 @@ async def personalisation_agent_node(state: AgentState) -> AgentState:
         for use_fallback in (False, True):
             try:
                 llm = _get_llm(fallback=use_fallback)
-                response = await llm.ainvoke(messages)
+                response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
                 personalised_emails[target_id] = {
                     "subject": personalised_subject,
                     "body": response.content.strip(),

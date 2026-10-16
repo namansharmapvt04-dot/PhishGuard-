@@ -52,7 +52,7 @@ export default function CampaignDetail() {
           <h1 className="text-2xl font-bold text-foreground">{campaign.name}</h1>
           <StateBadge state={campaign.state} />
         </div>
-        {campaign.state === 'DONE' && (
+        {['RUNNING', 'PAUSED', 'DONE'].includes(campaign.state) && (
           <Link to={`/campaigns/${campaign.id}/results`} className="btn-ghost">
             <BarChart3 className="h-4 w-4" /> View results
           </Link>

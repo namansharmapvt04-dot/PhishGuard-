@@ -22,9 +22,24 @@ class MailerError(Exception):
     pass
 
 
+def _ensure_html(body: str) -> str:
+    """
+    The generator LLM is asked for "HTML-safe" output but — especially with
+    smaller models — often just returns plain text with \\n line breaks.
+    HTML ignores bare newlines, so that collapses into one run-on paragraph
+    (looks exactly like spam). If there's no block-level HTML already, treat
+    it as plain text and convert blank-line-separated paragraphs to <p>.
+    """
+    if re.search(r"<(p|br|div|table)[\s/>]", body, re.IGNORECASE):
+        return body
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", body.strip()) if p.strip()]
+    return "".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paragraphs)
+
+
 def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
     """Rewrite every link to go through the click-tracking redirect, and
     append the open-tracking pixel."""
+    body_html = _ensure_html(body_html)
     click_url = f"{base_url}/track/click/{tracking_token}"
     tracked = re.sub(r'href="[^"]*"', f'href="{click_url}"', body_html)
     pixel = f'<img src="{base_url}/track/open/{tracking_token}" width="1" height="1" style="display:none" alt="">'

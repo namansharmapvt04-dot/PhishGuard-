@@ -101,4 +101,44 @@
   .table-td {
     @apply px-4 py-3 text-sm text-foreground border-t border-navy-700;
   }
+
+  /* RichTextEditor (TipTap) content area — Tailwind's base reset strips
+     default list/table/img styling, so the editor needs its own. */
+  .prose-email p {
+    margin: 0 0 0.75em;
+  }
+  .prose-email ul,
+  .prose-email ol {
+    margin: 0 0 0.75em;
+    padding-left: 1.5em;
+  }
+  .prose-email ul {
+    list-style: disc;
+  }
+  .prose-email ol {
+    list-style: decimal;
+  }
+  .prose-email a {
+    color: theme('colors.cyber.cyan');
+    text-decoration: underline;
+  }
+  .prose-email img {
+    max-width: 100%;
+    border-radius: 6px;
+  }
+  .prose-email table {
+    border-collapse: collapse;
+    margin: 0 0 0.75em;
+    width: 100%;
+  }
+  .prose-email th,
+  .prose-email td {
+    border: 1px solid theme('colors.navy.700');
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .prose-email th {
+    background: theme('colors.navy.800');
+    font-weight: 600;
+  }
 }

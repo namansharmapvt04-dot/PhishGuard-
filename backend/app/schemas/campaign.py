@@ -20,6 +20,8 @@ class CampaignUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     scheduled_at: datetime | None = None
+    email_subject: str | None = Field(None, max_length=500)
+    email_body: str | None = Field(None, max_length=10000)
 
 
 class CampaignOut(BaseModel):

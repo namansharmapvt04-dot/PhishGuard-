@@ -2,11 +2,13 @@
 PhishGuard — FastAPI application entry point.
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.api.auth import router as auth_router
@@ -63,6 +65,11 @@ app.include_router(campaigns_router, prefix=API_PREFIX)
 app.include_router(targets_router, prefix=API_PREFIX)
 app.include_router(tracking_router)   # /track/* — no versioning prefix (links go in emails)
 app.include_router(landing_router)    # /phish/{token} — fake landing page, no versioning prefix
+
+# Uploaded campaign images (logos, screenshots pasted into the email body).
+_static_dir = Path("static")
+_static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

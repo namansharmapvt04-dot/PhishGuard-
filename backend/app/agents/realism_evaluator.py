@@ -3,6 +3,7 @@ Node 3 — Realism Evaluator
 Scores the generated email on 5 realism dimensions using RAGAS-style evaluation.
 Uses Self-Refinement prompting (feeds failure reason back on retry).
 """
+import asyncio
 import json
 import structlog
 
@@ -33,14 +34,18 @@ Score each dimension 0.0–1.0:
 
 {retry_feedback}
 
-Output ONLY:
+Give each dimension its own real score based on the email above. A score of
+exactly 0.0 means that dimension is completely absent — most real emails
+score somewhere in between, not at the extremes.
+
+Output ONLY this JSON, with each field replaced by a real number 0.0-1.0:
 {{
-  "authority_cue": 0.0,
-  "urgency_realism": 0.0,
-  "language_quality": 0.0,
-  "personalisation": 0.0,
-  "call_to_action": 0.0,
-  "overall_score": 0.0,
+  "authority_cue": "<0.0-1.0>",
+  "urgency_realism": "<0.0-1.0>",
+  "language_quality": "<0.0-1.0>",
+  "personalisation": "<0.0-1.0>",
+  "call_to_action": "<0.0-1.0>",
+  "overall_score": "<0.0-1.0>",
   "feedback": "one sentence on the main weakness"
 }}
 """
@@ -78,16 +83,24 @@ async def realism_evaluator_node(state: AgentState) -> AgentState:
     for use_fallback in (False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
-            response = await llm.ainvoke(messages)
+            response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
             scores = json.loads(response.content.strip())
 
-            overall = scores.get("overall_score") or (
+            def _num(key: str) -> float:
+                # The model sometimes returns a numeric-looking string
+                # instead of a number — coerce either way, default 0.0.
+                try:
+                    return float(scores.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    return 0.0
+
+            overall = _num("overall_score") or (
                 sum([
-                    scores.get("authority_cue", 0),
-                    scores.get("urgency_realism", 0),
-                    scores.get("language_quality", 0),
-                    scores.get("personalisation", 0),
-                    scores.get("call_to_action", 0),
+                    _num("authority_cue"),
+                    _num("urgency_realism"),
+                    _num("language_quality"),
+                    _num("personalisation"),
+                    _num("call_to_action"),
                 ]) / 5
             )
             eval_passed = overall >= settings.RAGAS_PASS_THRESHOLD

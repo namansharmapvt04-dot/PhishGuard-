@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Agent config
     RAGAS_PASS_THRESHOLD: float = 0.75
-    MAX_RETRIES: int = 3
+    MAX_RETRIES: int = 2
 
     # ChromaDB
     CHROMA_PERSIST_DIR: str = "./chroma_db"
