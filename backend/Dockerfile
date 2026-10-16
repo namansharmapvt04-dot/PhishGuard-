@@ -17,8 +17,14 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
+# Seed ChromaDB into the image itself (downloads the embedding model + builds
+# the pattern collection once, at build time). Hosts with no persistent disk
+# on their free tier (e.g. Render) wipe ./chroma_db on every restart —  baking
+# it into the image means it survives restarts without needing a volume.
+RUN python scripts/seed_chromadb.py
+
 EXPOSE 8000
 
-# Apply migrations, then start the API. (Run `make migration` once to generate
-# the initial migration — see the note in docker-compose.yml / Makefile.)
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Apply migrations, then start the API. $PORT is set by PaaS hosts (Render,
+# etc) at runtime; falls back to 8000 for local/compose use.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

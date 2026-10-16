@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
 
+    @property
+    def frontend_origins(self) -> list[str]:
+        """FRONTEND_URL may be a comma-separated list (prod domain + Vercel preview URLs)."""
+        return [o.strip() for o in self.FRONTEND_URL.split(",") if o.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:

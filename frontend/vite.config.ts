@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
+      // Vite rejects requests with an unrecognised Host header by default —
+      // needed so the dev server is reachable through a tunnel (dev
+      // convenience only, this file doesn't run in production). Vite 5
+      // doesn't support `true` here (added in a later version) — list
+      // specific suffixes instead; covers both tunnel providers in use.
+      allowedHosts: ['immune-file-hear-expensive.trycloudflare.com', '.trycloudflare.com', '.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {
         '/api': { target: proxyTarget, changeOrigin: true },
         '/track': { target: proxyTarget, changeOrigin: true },

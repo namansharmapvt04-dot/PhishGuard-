@@ -1,0 +1,55 @@
+# Render Blueprint — deploys the FastAPI backend + a free Redis-compatible
+# Key Value store. Postgres is deliberately NOT defined here: Render's free
+# Postgres wipes all data 30 days after creation, which is unacceptable for
+# real campaign/account data. Use a free Neon (neon.tech) Postgres instead
+# and paste its connection string into DATABASE_URL below after this first
+# deploys (see the deployment runbook).
+services:
+  - type: web
+    name: phishguard-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # paste your Neon connection string in the Render dashboard
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: phishguard-kv
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false   # your Vercel URL(s), comma-separated
+      - key: BASE_URL
+        sync: false   # this service's own public URL, filled in after first deploy
+      - key: ENVIRONMENT
+        value: production
+      - key: PRIMARY_MODEL
+        value: allam-2-7b
+      - key: FALLBACK_MODEL
+        value: gpt-4o
+      - key: RAGAS_PASS_THRESHOLD
+        value: 0.75
+      - key: MAX_RETRIES
+        value: 2
+      - key: BREVO_DAILY_LIMIT
+        value: 300
+      - key: TRACKING_WINDOW_DAYS
+        value: 14
+
+  - type: keyvalue
+    name: phishguard-kv
+    plan: free
+    ipAllowList: []
