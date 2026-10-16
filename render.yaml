@@ -1,9 +1,9 @@
-# Render Blueprint — deploys the FastAPI backend + a free Redis-compatible
-# Key Value store. Postgres is deliberately NOT defined here: Render's free
-# Postgres wipes all data 30 days after creation, which is unacceptable for
-# real campaign/account data. Use a free Neon (neon.tech) Postgres instead
-# and paste its connection string into DATABASE_URL below after this first
-# deploys (see the deployment runbook).
+# Render Blueprint — deploys the FastAPI backend, the React frontend as a
+# free static site, and a free Redis-compatible Key Value store. Postgres is
+# deliberately NOT defined here: Render's free Postgres wipes all data 30
+# days after creation, which is unacceptable for real campaign/account data.
+# Use a free Neon (neon.tech) Postgres instead and paste its connection
+# string into DATABASE_URL below after this first deploys.
 services:
   - type: web
     name: phishguard-api
@@ -48,6 +48,22 @@ services:
         value: 300
       - key: TRACKING_WINDOW_DAYS
         value: 14
+
+  - type: web
+    name: phishguard-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false   # the phishguard-api service's URL, filled in once it's deployed
+    routes:
+      # SPA fallback — React Router handles routing client-side, so every
+      # path must still serve index.html instead of 404ing on refresh.
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   - type: keyvalue
     name: phishguard-kv
