@@ -1,7 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
-// All versioned endpoints live under /api/v1; the dev server proxies /api → backend.
+// All versioned endpoints live under /api/v1. In dev, Vite's proxy forwards
+// bare `/api/v1` to the backend (see vite.config.ts). In production there's
+// no proxy — VITE_API_BASE_URL must point at the deployed backend's origin.
 export const API_PREFIX = '/api/v1'
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}${API_PREFIX}`
 
 const ACCESS_KEY = 'pg_access_token'
 const REFRESH_KEY = 'pg_refresh_token'
@@ -24,7 +27,7 @@ export const tokenStore = {
 }
 
 export const api = axios.create({
-  baseURL: API_PREFIX,
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -43,7 +46,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refresh) return null
   try {
     // Bare axios call so we don't recurse through this interceptor.
-    const { data } = await axios.post(`${API_PREFIX}/auth/refresh`, {
+    const { data } = await axios.post(`${API_BASE}/auth/refresh`, {
       refresh_token: refresh,
     })
     tokenStore.set(data.access_token)
