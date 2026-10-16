@@ -3,10 +3,11 @@ Campaign endpoints: CRUD + trigger generation pipeline + SSE progress stream.
 """
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 import structlog
 
 from app.config import settings
@@ -67,11 +68,56 @@ async def update_campaign(campaign_id: uuid.UUID, payload: CampaignUpdate, curre
     campaign = await _get_campaign_or_404(campaign_id, current_user, db)
     if campaign.state not in (CampaignState.DRAFT, CampaignState.READY, CampaignState.ESCALATED):
         raise HTTPException(status_code=400, detail="Cannot edit a campaign that is running or done")
-    for field, value in payload.model_dump(exclude_none=True).items():
+    fields = payload.model_dump(exclude_none=True)
+    for field, value in fields.items():
         setattr(campaign, field, value)
+
+    if "email_subject" in fields or "email_body" in fields:
+        # A manual edit invalidates whatever the Personalisation Agent wrote
+        # for the old template — clear it so /launch falls back to the
+        # (variable-substituted) edited template instead of stale AI content.
+        await db.execute(
+            update(Target)
+            .where(Target.campaign_id == campaign_id)
+            .values(personalised_subject=None, personalised_body=None)
+        )
+        # A hand-written email is exactly the recovery path for a campaign
+        # the AI escalated (or one drafted without running Generate at all)
+        # — if it now has complete content, it's launchable.
+        if campaign.state in (CampaignState.ESCALATED, CampaignState.DRAFT) and campaign.email_subject and campaign.email_body:
+            campaign.state = CampaignState.READY
+
     await db.flush()
     await db.refresh(campaign)
     return campaign
+
+
+ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/{campaign_id}/images")
+async def upload_campaign_image(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, file: UploadFile):
+    """
+    Uploads an image (e.g. a logo or screenshot) to embed in the email body.
+    Returns a public URL to paste into the Email Preview editor.
+    """
+    await _get_campaign_or_404(campaign_id, current_user, db)
+
+    ext = ALLOWED_IMAGE_TYPES.get(file.content_type)
+    if not ext:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF or WebP images are allowed")
+
+    data = await file.read()
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+
+    upload_dir = Path("static/uploads") / str(campaign_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4()}.{ext}"
+    (upload_dir / filename).write_bytes(data)
+
+    return {"url": f"{settings.BASE_URL}/static/uploads/{campaign_id}/{filename}"}
 
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -209,6 +255,22 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+def _substitute_variables(text: str, target: Target, organization_name: str) -> str:
+    """Plain {variable} substitution — used when a target has no AI-personalised
+    content (e.g. the template was hand-edited after generation)."""
+    first_name = (target.full_name or "").split(" ", 1)[0] or "there"
+    last_name = (target.full_name or "").split(" ", 1)[1] if " " in (target.full_name or "") else ""
+    return (
+        text.replace("{first_name}", first_name)
+        .replace("{last_name}", last_name)
+        .replace("{full_name}", target.full_name or "")
+        .replace("{department}", target.department or "your department")
+        .replace("{job_title}", target.job_title or "")
+        .replace("{manager_name}", target.manager_name or "your manager")
+        .replace("{company}", organization_name)
+    )
+
+
 # ── Launch (actually send the emails) ────────────────────────────────────────
 
 async def _reserve_quota(redis: Redis, count: int) -> int:
@@ -245,6 +307,9 @@ async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
     if not campaign.email_subject or not campaign.email_body:
         raise HTTPException(status_code=400, detail="No generated email to send — run Generate first")
 
+    await db.refresh(current_user, ["organization"])
+    organization_name = current_user.organization.name
+
     pending_result = await db.execute(
         select(Target).where(Target.campaign_id == campaign_id, Target.status == TargetStatus.PENDING)
     )
@@ -257,8 +322,8 @@ async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
 
     sent = failed = 0
     for target in to_send:
-        subject = target.personalised_subject or campaign.email_subject
-        body = target.personalised_body or campaign.email_body
+        subject = target.personalised_subject or _substitute_variables(campaign.email_subject, target, organization_name)
+        body = target.personalised_body or _substitute_variables(campaign.email_body, target, organization_name)
         tracked_body = inject_tracking(body, settings.BASE_URL, target.tracking_token)
         try:
             await send_email(
@@ -315,6 +380,22 @@ async def resume_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
     if campaign.state != CampaignState.PAUSED:
         raise HTTPException(status_code=400, detail="Only PAUSED campaigns can be resumed")
     campaign.state = CampaignState.RUNNING
+    await db.flush()
+    await db.refresh(campaign)
+    return campaign
+
+
+@router.post("/{campaign_id}/complete", response_model=CampaignOut)
+async def complete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """Manually closes out tracking for a campaign — nothing currently does
+    this automatically (e.g. after TRACKING_WINDOW_DAYS), so without this
+    action a launched campaign sits in RUNNING forever and DONE (which
+    /analyse requires) is unreachable."""
+    campaign = await _get_campaign_or_404(campaign_id, current_user, db)
+    if campaign.state not in (CampaignState.RUNNING, CampaignState.PAUSED):
+        raise HTTPException(status_code=400, detail="Only a RUNNING or PAUSED campaign can be marked complete")
+    campaign.state = CampaignState.DONE
+    campaign.completed_at = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(campaign)
     return campaign

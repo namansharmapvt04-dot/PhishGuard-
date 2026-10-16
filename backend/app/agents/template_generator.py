@@ -3,6 +3,7 @@ Node 2 — Template Generator
 Generates the phishing email template using RAG few-shot patterns.
 Uses RAG + Few-Shot + Structured Output prompting.
 """
+import asyncio
 import json
 import structlog
 
@@ -82,7 +83,7 @@ async def template_generator_node(state: AgentState) -> AgentState:
     for use_fallback in (False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
-            response = await llm.ainvoke(messages)
+            response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
             result = json.loads(response.content.strip())
             log.info("template_generator.done", subject=result.get("subject"))
             return {

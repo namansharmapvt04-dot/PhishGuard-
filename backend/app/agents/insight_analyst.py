@@ -3,6 +3,7 @@ Node 5 — Insight Analyst
 Post-campaign: analyses click/open/credential data and generates
 actionable training recommendations.
 """
+import asyncio
 import json
 import structlog
 
@@ -59,7 +60,7 @@ async def insight_analyst_node(state: AgentState) -> AgentState:
     for use_fallback in (False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
-            response = await llm.ainvoke(messages)
+            response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
             insights = json.loads(response.content.strip())
             log.info("insight_analyst.done", risk_level=insights.get("risk_level"))
             return {**state, "insights": insights, "error": None}

@@ -64,6 +64,8 @@ export interface CampaignUpdate {
   name?: string
   description?: string | null
   scheduled_at?: string | null
+  email_subject?: string | null
+  email_body?: string | null
 }
 
 export interface LaunchResult {
@@ -124,6 +126,11 @@ export const campaignsApi = {
     const { data } = await api.post<Campaign>(`/campaigns/${id}/resume`)
     return data
   },
+  async complete(id: string): Promise<Campaign> {
+    if (isDemo()) return demoApi.setState(id, 'DONE')
+    const { data } = await api.post<Campaign>(`/campaigns/${id}/complete`)
+    return data
+  },
   async stats(id: string): Promise<CampaignStats> {
     if (isDemo()) return demoApi.stats(id)
     const { data } = await api.get<CampaignStats>(`/campaigns/${id}/stats`)
@@ -137,6 +144,15 @@ export const campaignsApi = {
   async launch(id: string): Promise<LaunchResult> {
     if (isDemo()) return { sent: 0, failed: 0, remaining_pending: 0, message: 'Demo mode does not send real email.' }
     const { data } = await api.post<LaunchResult>(`/campaigns/${id}/launch`)
+    return data
+  },
+  async uploadImage(id: string, file: File): Promise<{ url: string }> {
+    if (isDemo()) return { url: URL.createObjectURL(file) }
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post<{ url: string }>(`/campaigns/${id}/images`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data
   },
 }

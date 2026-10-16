@@ -3,6 +3,7 @@ Node 1 — Campaign Planner
 Analyses the campaign config and reasons about the best attack strategy.
 Uses Role/Persona + Chain-of-Thought prompting.
 """
+import asyncio
 import json
 import structlog
 
@@ -86,7 +87,10 @@ async def campaign_planner_node(state: AgentState) -> AgentState:
     for use_fallback in (False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
-            response = await llm.ainvoke(messages)
+            # request_timeout on the client is unreliable in this environment
+            # (observed hanging indefinitely despite being set) — this is a
+            # hard backstop that can't fail the same way.
+            response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
             plan = json.loads(response.content.strip())
             log.info("campaign_planner.done", plan=plan)
             return {
