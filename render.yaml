@@ -2,8 +2,9 @@
 # free static site, and a free Redis-compatible Key Value store. Postgres is
 # deliberately NOT defined here: Render's free Postgres wipes all data 30
 # days after creation, which is unacceptable for real campaign/account data.
-# Use a free Neon (neon.tech) Postgres instead and paste its connection
-# string into DATABASE_URL below after this first deploys.
+# Use a free Neon (neon.tech) Postgres instead — paste its UNPOOLED
+# connection string into DATABASE_URL below, rewritten to
+# postgresql+asyncpg://...?ssl=require (see backend/.env.example for why).
 services:
   - type: web
     name: phishguard-api
