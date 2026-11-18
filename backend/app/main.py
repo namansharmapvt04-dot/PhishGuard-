@@ -25,10 +25,26 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     log.info("phishguard.startup", env=settings.ENVIRONMENT)
 
-    # Warm up ChromaDB collection on startup
+    # BASE_URL/FRONTEND_URL feed straight into tracking pixels, click
+    # redirects, and the sim-landing link embedded in every sent email —
+    # if ENVIRONMENT=production but either is still its localhost default,
+    # every link in every sent email is dead on arrival for the recipient.
+    # render.yaml marks both `sync: false` precisely so this can't happen
+    # silently; this is the last line of defense if someone deploys without
+    # filling them in on the dashboard.
+    if settings.is_production:
+        if settings.BASE_URL.startswith("http://localhost"):
+            log.error("config.base_url_not_set", detail="BASE_URL is still localhost in production — tracking links will be unreachable")
+        if any(o.startswith("http://localhost") for o in settings.frontend_origins):
+            log.error("config.frontend_url_not_set", detail="FRONTEND_URL is still localhost in production — CORS will reject the real frontend")
+
+    # Warm up ChromaDB collection on startup, self-seeding if it's empty —
+    # normally a no-op since the Docker image already bakes the patterns in
+    # at build time, but this is cheap insurance against a deploy path (or
+    # host) where that didn't happen.
     try:
-        from app.rag.vectorstore import collection_count
-        count = collection_count()
+        from app.rag.vectorstore import ensure_seeded
+        count = ensure_seeded()
         log.info("rag.ready", patterns=count)
     except Exception as e:
         log.warning("rag.warmup_failed", error=str(e))
@@ -52,6 +68,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_origins,
+    # Every Vercel preview deployment gets its own random *.vercel.app
+    # subdomain — listing each one in FRONTEND_URL by hand isn't workable,
+    # so preview URLs are matched by pattern instead. Harmless in local dev
+    # (nothing served from vercel.app there) and scoped to a domain only
+    # Vercel itself issues, not a security loosening.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

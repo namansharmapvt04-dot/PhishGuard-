@@ -90,3 +90,20 @@ def upsert_patterns(patterns: list[dict]) -> int:
 
 def collection_count() -> int:
     return _get_collection().count()
+
+
+def ensure_seeded() -> int:
+    """
+    Safety net for a fresh container boot with an empty collection — the
+    Dockerfile already bakes the seeded patterns into the image at build
+    time (so a normal restart never hits this), but this guards against any
+    deploy path that skips that build step, or a host whose disk genuinely
+    doesn't persist across restarts. No-ops (zero extra round trips) once
+    the collection is already populated. Returns the collection's final count.
+    """
+    count = collection_count()
+    if count == 0:
+        from app.rag.seed_patterns import PHISHING_PATTERNS
+        upsert_patterns(PHISHING_PATTERNS)
+        count = collection_count()
+    return count

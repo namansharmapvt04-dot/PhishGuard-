@@ -1,13 +1,14 @@
 import { FormEvent, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ShieldAlert, GraduationCap } from 'lucide-react'
+import { API_ORIGIN } from '../api/client'
 
-// Not proxied through the versioned `api` client (see api/client.ts) —
-// tracking routes live at the backend origin directly, same as the pixel
-// and click-redirect links embedded in the email. Empty string in dev
-// falls through to Vite's own /track proxy (vite.config.ts); in production
-// VITE_API_BASE_URL points at the deployed backend's origin.
-const API_ORIGIN = import.meta.env.VITE_API_BASE_URL ?? ''
+// Not proxied through the versioned `api` client's /api/v1 prefix — tracking
+// routes live at the backend origin directly, same as the pixel and
+// click-redirect links embedded in the email. Empty string in dev falls
+// through to Vite's own /track proxy (vite.config.ts); in production
+// API_ORIGIN (from api/client.ts, trailing slash already stripped) points
+// at the deployed backend's origin.
 
 const INDICATORS = [
   'A false sense of urgency ("act now", a deadline, a threat of consequences)',

@@ -3,8 +3,15 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 // All versioned endpoints live under /api/v1. In dev, Vite's proxy forwards
 // bare `/api/v1` to the backend (see vite.config.ts). In production there's
 // no proxy — VITE_API_BASE_URL must point at the deployed backend's origin.
+// Trailing slash stripped defensively: a value like "https://x.onrender.com/"
+// pasted into Vercel's env var UI (easy to do without noticing) would
+// otherwise combine with the leading slash below into "https://x.onrender.com//api/...".
+export const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 export const API_PREFIX = '/api/v1'
-const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}${API_PREFIX}`
+// Full origin + prefix — the one other modules (sse.ts, SimLanding.tsx) must
+// use for any URL they build by hand, since a bare API_PREFIX is relative
+// and would resolve against the frontend's own origin, not the backend's.
+export const API_BASE = `${API_ORIGIN}${API_PREFIX}`
 
 const ACCESS_KEY = 'pg_access_token'
 const REFRESH_KEY = 'pg_refresh_token'

@@ -1,4 +1,4 @@
-import { API_PREFIX, tokenStore } from '../api/client'
+import { API_BASE, tokenStore } from '../api/client'
 
 export interface SSEMessage {
   event: string
@@ -77,7 +77,7 @@ function streamRequest(url: string, method: 'GET' | 'POST', handlers: StreamHand
  * just the UI's view of it. Aborting is only for an explicit user cancel.
  */
 export function streamGeneration(campaignId: string, handlers: StreamHandlers): AbortController {
-  return streamRequest(`${API_PREFIX}/campaigns/${campaignId}/generate`, 'POST', handlers)
+  return streamRequest(`${API_BASE}/campaigns/${campaignId}/generate`, 'POST', handlers)
 }
 
 /**
@@ -87,7 +87,7 @@ export function streamGeneration(campaignId: string, handlers: StreamHandlers): 
  * pipeline.
  */
 export function streamGenerationProgress(campaignId: string, handlers: StreamHandlers): AbortController {
-  return streamRequest(`${API_PREFIX}/campaigns/${campaignId}/generate/stream`, 'GET', handlers)
+  return streamRequest(`${API_BASE}/campaigns/${campaignId}/generate/stream`, 'GET', handlers)
 }
 
 function parseFrame(frame: string): SSEMessage | null {
