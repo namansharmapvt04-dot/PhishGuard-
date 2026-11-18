@@ -1,11 +1,12 @@
 """
 PhishGuard — FastAPI application entry point.
 """
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +56,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Timing ───────────────────────────────────────────────────────────────────
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """
+    Surfaces per-request latency as an X-Process-Time response header and a
+    terminal warning for anything slow, so a regression (e.g. a cold Neon
+    connection, an N+1 query) is visible immediately instead of only showing
+    up as "the UI feels slow" with no lead on where to look.
+    """
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Process-Time"] = f"{duration_ms:.1f}ms"
+    if duration_ms > 200:
+        log.warning("slow_request", path=request.url.path, method=request.method, duration_ms=round(duration_ms, 1))
+    return response
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 

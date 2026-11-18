@@ -15,6 +15,7 @@ import structlog
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB, Redis
+from app.core.cache import cache_get, cache_set, cache_invalidate
 from app.models.campaign import Campaign, CampaignState
 from app.models.target import Target, TargetStatus
 from app.models.tracking import TrackingEvent, EventType
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 # ── CRUD ────────────────────────────────────────────────────────────────────
 
 @router.post("", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
-async def create_campaign(payload: CampaignCreate, current_user: CurrentUser, db: DB):
+async def create_campaign(payload: CampaignCreate, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = Campaign(
         name=payload.name,
         description=payload.description,
@@ -44,11 +45,27 @@ async def create_campaign(payload: CampaignCreate, current_user: CurrentUser, db
     db.add(campaign)
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 
+# The frontend always lists with these defaults (no pagination UI exists
+# yet) — caching/invalidating just this one (org_id, skip, limit) key covers
+# the real traffic. A request with different skip/limit still works, just
+# always misses the cache rather than risking a wrong invalidation scheme.
+_CAMPAIGN_LIST_DEFAULT_SKIP = 0
+_CAMPAIGN_LIST_DEFAULT_LIMIT = 20
+
+
+async def _invalidate_campaign_list_cache(redis: Redis, organization_id: uuid.UUID) -> None:
+    await cache_invalidate(redis, "campaigns", organization_id, _CAMPAIGN_LIST_DEFAULT_SKIP, _CAMPAIGN_LIST_DEFAULT_LIMIT)
+
+
 @router.get("", response_model=list[CampaignOut])
-async def list_campaigns(current_user: CurrentUser, db: DB, skip: int = 0, limit: int = 20):
+async def list_campaigns(current_user: CurrentUser, db: DB, redis: Redis, skip: int = 0, limit: int = 20):
+    cached = await cache_get(redis, "campaigns", current_user.organization_id, skip, limit)
+    if cached is not None:
+        return cached
     result = await db.execute(
         select(Campaign)
         .where(Campaign.organization_id == current_user.organization_id)
@@ -56,7 +73,12 @@ async def list_campaigns(current_user: CurrentUser, db: DB, skip: int = 0, limit
         .offset(skip)
         .limit(limit)
     )
-    return result.scalars().all()
+    campaigns = result.scalars().all()
+    await cache_set(
+        redis, "campaigns", current_user.organization_id, skip, limit,
+        value=[CampaignOut.model_validate(c).model_dump(mode="json") for c in campaigns],
+    )
+    return campaigns
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)
@@ -66,7 +88,7 @@ async def get_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB
 
 
 @router.patch("/{campaign_id}", response_model=CampaignOut)
-async def update_campaign(campaign_id: uuid.UUID, payload: CampaignUpdate, current_user: CurrentUser, db: DB):
+async def update_campaign(campaign_id: uuid.UUID, payload: CampaignUpdate, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _get_campaign_or_404(campaign_id, current_user, db)
     if campaign.state not in (CampaignState.DRAFT, CampaignState.READY, CampaignState.ESCALATED):
         raise HTTPException(status_code=400, detail="Cannot edit a campaign that is running or done")
@@ -91,6 +113,7 @@ async def update_campaign(campaign_id: uuid.UUID, payload: CampaignUpdate, curre
 
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 
@@ -123,11 +146,14 @@ async def upload_campaign_image(campaign_id: uuid.UUID, current_user: CurrentUse
 
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def delete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _get_campaign_or_404(campaign_id, current_user, db)
     if campaign.state == CampaignState.RUNNING:
         raise HTTPException(status_code=400, detail="Cannot delete a running campaign")
     await db.delete(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
+    await cache_invalidate(redis, "stats", campaign_id)
+    await cache_invalidate(redis, "targets", campaign_id)
 
 
 # ── Generation pipeline ─────────────────────────────────────────────────────
@@ -159,6 +185,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     # Transition to GENERATING immediately
     campaign.state = CampaignState.GENERATING
     await db.flush()
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
 
     # Fresh run — drop any progress log left over from a prior generate/
     # re-generate on this campaign so a reconnecting client never replays
@@ -276,6 +303,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                     })
 
                 await write_db.commit()
+                await _invalidate_campaign_list_cache(redis, current_user.organization_id)
 
             except Exception as e:
                 log.error("generate.stream_error", error=str(e))
@@ -292,6 +320,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                     "error": str(e),
                 }
                 await write_db.commit()
+                await _invalidate_campaign_list_cache(redis, current_user.organization_id)
                 yield await _emit(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
@@ -432,6 +461,8 @@ async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
         campaign.started_at = campaign.started_at or datetime.now(timezone.utc)
 
     await db.flush()
+    await cache_invalidate(redis, "stats", campaign_id)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
 
     message = None
     if to_defer:
@@ -450,29 +481,31 @@ async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
 # ── Campaign control ─────────────────────────────────────────────────────────
 
 @router.post("/{campaign_id}/pause", response_model=CampaignOut)
-async def pause_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def pause_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _get_campaign_or_404(campaign_id, current_user, db)
     if campaign.state != CampaignState.RUNNING:
         raise HTTPException(status_code=400, detail="Only RUNNING campaigns can be paused")
     campaign.state = CampaignState.PAUSED
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 
 @router.post("/{campaign_id}/resume", response_model=CampaignOut)
-async def resume_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def resume_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _get_campaign_or_404(campaign_id, current_user, db)
     if campaign.state != CampaignState.PAUSED:
         raise HTTPException(status_code=400, detail="Only PAUSED campaigns can be resumed")
     campaign.state = CampaignState.RUNNING
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 
 @router.post("/{campaign_id}/complete", response_model=CampaignOut)
-async def complete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def complete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     """Manually closes out tracking for a campaign — nothing currently does
     this automatically (e.g. after TRACKING_WINDOW_DAYS), so without this
     action a launched campaign sits in RUNNING forever and DONE (which
@@ -484,6 +517,7 @@ async def complete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     campaign.completed_at = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 
@@ -528,15 +562,20 @@ async def _compute_stats(campaign_id: uuid.UUID, db: DB) -> CampaignStats:
 
 
 @router.get("/{campaign_id}/stats", response_model=CampaignStats)
-async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def campaign_stats(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     await _get_campaign_or_404(campaign_id, current_user, db)
-    return await _compute_stats(campaign_id, db)
+    cached = await cache_get(redis, "stats", campaign_id)
+    if cached is not None:
+        return cached
+    stats = await _compute_stats(campaign_id, db)
+    await cache_set(redis, "stats", campaign_id, value=stats.model_dump(mode="json"))
+    return stats
 
 
 # ── Insight analyst ──────────────────────────────────────────────────────────
 
 @router.post("/{campaign_id}/analyse", response_model=CampaignOut)
-async def analyse_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def analyse_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     """
     Runs the insight-analyst agent over this campaign's tracking results and
     persists risk_level/vulnerability_summary/top_vulnerabilities/
@@ -576,6 +615,7 @@ async def analyse_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db
     campaign.agent_metadata = {**(campaign.agent_metadata or {}), **insights}
     await db.flush()
     await db.refresh(campaign)
+    await _invalidate_campaign_list_cache(redis, current_user.organization_id)
     return campaign
 
 

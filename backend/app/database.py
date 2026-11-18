@@ -9,6 +9,11 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
+    # Recycle pooled connections before Neon's own idle-connection reaper (or
+    # a NAT/load-balancer in between) can silently drop them — a connection
+    # that's gone stale server-side without pool_pre_ping catching it would
+    # otherwise fail the next request that picks it up.
+    pool_recycle=240,
     # Fail fast instead of hanging a request indefinitely: pool_timeout caps
     # how long a request waits for a free connection when the pool is
     # exhausted, and connect_args' timeout caps establishing a brand new

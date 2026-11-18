@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 import structlog
 
-from app.dependencies import CurrentUser, DB
+from app.dependencies import CurrentUser, DB, Redis
+from app.core.cache import cache_get, cache_set, cache_invalidate
 from app.models.campaign import Campaign, CampaignState
 from app.models.target import Target
 from app.schemas.target import TargetCreate, TargetBulkCreate, TargetOut, TargetActivity
@@ -36,16 +37,21 @@ async def _verify_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db
 
 
 @router.get("", response_model=list[TargetOut])
-async def list_targets(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def list_targets(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     await _verify_campaign(campaign_id, current_user, db)
+    cached = await cache_get(redis, "targets", campaign_id)
+    if cached is not None:
+        return cached
     result = await db.execute(
         select(Target).where(Target.campaign_id == campaign_id).order_by(Target.created_at)
     )
-    return result.scalars().all()
+    targets = result.scalars().all()
+    await cache_set(redis, "targets", campaign_id, value=[TargetOut.model_validate(t).model_dump(mode="json") for t in targets])
+    return targets
 
 
 @router.post("", response_model=TargetOut, status_code=status.HTTP_201_CREATED)
-async def add_target(campaign_id: uuid.UUID, payload: TargetCreate, current_user: CurrentUser, db: DB):
+async def add_target(campaign_id: uuid.UUID, payload: TargetCreate, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _verify_campaign(campaign_id, current_user, db)
     if campaign.state not in (CampaignState.DRAFT, CampaignState.READY, CampaignState.SCHEDULED):
         raise HTTPException(status_code=400, detail="Cannot add targets to a running or completed campaign")
@@ -63,11 +69,12 @@ async def add_target(campaign_id: uuid.UUID, payload: TargetCreate, current_user
     db.add(target)
     await db.flush()
     await db.refresh(target)
+    await cache_invalidate(redis, "targets", campaign_id)
     return target
 
 
 @router.post("/bulk", response_model=list[TargetOut], status_code=status.HTTP_201_CREATED)
-async def bulk_add_targets(campaign_id: uuid.UUID, payload: TargetBulkCreate, current_user: CurrentUser, db: DB):
+async def bulk_add_targets(campaign_id: uuid.UUID, payload: TargetBulkCreate, current_user: CurrentUser, db: DB, redis: Redis):
     campaign = await _verify_campaign(campaign_id, current_user, db)
     if campaign.state not in (CampaignState.DRAFT, CampaignState.READY, CampaignState.SCHEDULED):
         raise HTTPException(status_code=400, detail="Cannot add targets to a running or completed campaign")
@@ -90,12 +97,13 @@ async def bulk_add_targets(campaign_id: uuid.UUID, payload: TargetBulkCreate, cu
     await db.flush()
     for t in created:
         await db.refresh(t)
+    await cache_invalidate(redis, "targets", campaign_id)
     log.info("targets.bulk_created", count=len(created), campaign_id=str(campaign_id))
     return created
 
 
 @router.delete("/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_target(campaign_id: uuid.UUID, target_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def remove_target(campaign_id: uuid.UUID, target_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     await _verify_campaign(campaign_id, current_user, db)
     result = await db.execute(
         select(Target).where(Target.id == target_id, Target.campaign_id == campaign_id)
@@ -104,6 +112,7 @@ async def remove_target(campaign_id: uuid.UUID, target_id: uuid.UUID, current_us
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     await db.delete(target)
+    await cache_invalidate(redis, "targets", campaign_id)
 
 
 @router.get("/activity", response_model=list[TargetActivity])

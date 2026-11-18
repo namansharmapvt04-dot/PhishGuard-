@@ -33,9 +33,12 @@ async def get_redis() -> aioredis.Redis:
             # Without these, a dropped/idled-out Redis (e.g. local WSL Redis
             # going down) leaves every request touching it hanging on the OS
             # TCP timeout (20-30s+) instead of failing fast. retry_on_timeout
-            # off so a single slow attempt doesn't double the wait.
-            socket_timeout=2,
-            socket_connect_timeout=2,
+            # off so a single slow attempt doesn't double the wait. Tight
+            # enough that a stalled Redis can't meaningfully slow down a
+            # request that's using it only as a cache (see core/cache.py) —
+            # callers there already treat a timeout as a cache miss.
+            socket_timeout=1.0,
+            socket_connect_timeout=1.0,
             retry_on_timeout=False,
         )
     return _redis_client

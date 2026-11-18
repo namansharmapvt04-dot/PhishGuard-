@@ -9,6 +9,8 @@ from sqlalchemy import select
 import structlog
 
 from app.database import get_db
+from app.dependencies import get_redis
+from app.core.cache import cache_invalidate
 from app.models.target import Target
 from app.models.tracking import TrackingEvent, EventType
 from app.config import settings
@@ -55,6 +57,11 @@ async def _record_event(
         db.add(event)
         await db.commit()
         log.info("tracking.event", event_type=event_type, target_id=str(target.id))
+        # Every event here changes the campaign's open/click/submit/report
+        # counts — drop the cached stats so the dashboard doesn't sit on a
+        # pre-event snapshot for the rest of its TTL.
+        redis = await get_redis()
+        await cache_invalidate(redis, "stats", target.campaign_id)
         return target
 
 
