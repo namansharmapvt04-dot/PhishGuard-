@@ -38,6 +38,10 @@ def _ensure_html(body: str) -> str:
     return "".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paragraphs)
 
 
+_HREF_RE = re.compile(r'href\s*=\s*(["\'])(.*?)\1', re.IGNORECASE | re.DOTALL)
+_BARE_URL_RE = re.compile(r'https?://[^\s<>"\')]+', re.IGNORECASE)
+
+
 def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
     """Rewrite every link to go through the click-tracking redirect, and
     append the open-tracking pixel."""
@@ -48,7 +52,26 @@ def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
         )
     body_html = _ensure_html(body_html)
     click_url = f"{base_url}/track/click/{tracking_token}"
-    tracked = re.sub(r'href="[^"]*"', f'href="{click_url}"', body_html)
+
+    def _rewrite_href(m: re.Match) -> str:
+        quote, value = m.group(1), m.group(2)
+        if value.strip().lower().startswith("mailto:"):
+            return m.group(0)
+        return f"href={quote}{click_url}{quote}"
+
+    # Matches both href="..." and href='...' — the prior version was
+    # double-quote-only, so any LLM-generated single-quoted href (or one
+    # copied verbatim from a RAG few-shot example) slipped through
+    # untouched and could point a recipient straight at an invented,
+    # non-existent domain (DNS_PROBE_FINISHED_NXDOMAIN on click).
+    tracked = _HREF_RE.sub(_rewrite_href, body_html)
+
+    # Defense in depth: a model-invented URL never wrapped in a proper
+    # href (plain text in the body) wouldn't be caught by the rewrite
+    # above, and most email clients auto-linkify bare URLs anyway — swap
+    # out anything that still looks like a URL after the href pass too.
+    tracked = _BARE_URL_RE.sub(lambda m: click_url if m.group(0) != click_url else m.group(0), tracked)
+
     pixel = f'<img src="{base_url}/track/open/{tracking_token}" width="1" height="1" style="display:none" alt="">'
     return f"{tracked}{pixel}"
 

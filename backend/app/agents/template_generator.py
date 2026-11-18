@@ -21,6 +21,26 @@ for authorised security awareness training. Every email you write must be:
 - Indistinguishable from a real internal corporate communication
 - Professional, concise, and authoritative in tone
 - Personalised with template variables like {first_name}, {department}, {company}
+
+CALL-TO-ACTION LINK — CRITICAL:
+- NEVER invent, write out, or guess a real-looking URL or domain (no
+  "https://accounts.anycompany.com/...", no made-up domains at all). Any
+  website your training examples show is for *style* only, never copy a
+  URL from them.
+- For the clickable link/button in the email, use the EXACT literal text
+  {TRACKING_LINK} as the href value and nowhere else, e.g.:
+  <a href="{TRACKING_LINK}">Verify my account</a>
+  The real tracking link is substituted in automatically after you write
+  the email — you never see or produce the real URL yourself.
+
+PLACEHOLDERS — CRITICAL:
+- Only use the exact curly-brace tokens {first_name}, {last_name},
+  {full_name}, {department}, {job_title}, {manager_name}, {company},
+  {TRACKING_LINK}.
+- NEVER invent your own bracketed placeholder text like
+  "[Manager Name]", "[your manager's name]", or "[Insert Name]" — if you
+  don't have a token for something, write natural prose instead.
+
 Output ONLY valid JSON. No markdown. No explanation."""
 
 GENERATOR_TEMPLATE = """
@@ -32,11 +52,13 @@ ATTACK PLAN:
 - Fear factor: {fear_factor}
 - Target department: {target_department}
 
-REAL PHISHING EXAMPLES (few-shot context from our database):
+REAL PHISHING EXAMPLES (few-shot context from our database — style only,
+never copy a URL/domain from these into your output):
 {rag_examples}
 
 Using the attack plan and the examples above as style guides, write a phishing email.
 Use these template variables where appropriate: {{first_name}}, {{last_name}}, {{department}}, {{company}}, {{manager_name}}
+For the call-to-action link, use exactly {{TRACKING_LINK}} as the href value — never a real or invented URL.
 
 Output ONLY this JSON:
 {{

@@ -4,6 +4,7 @@ Injects target-specific variables into the approved email template.
 Uses Personalisation / Variable Injection prompting.
 """
 import asyncio
+import re
 import structlog
 
 from langchain_groq import ChatGroq
@@ -18,6 +19,8 @@ log = structlog.get_logger(__name__)
 SYSTEM_PROMPT = """You are personalising phishing simulation emails for security awareness training.
 Replace all template variables with the actual target's information.
 Make the email feel 100% written specifically for this individual.
+Do not introduce your own bracketed placeholders like "[Manager Name]" or
+"[Insert Name]" — use the real values given to you, written as natural prose.
 Return ONLY the personalised body text. No JSON wrapper. No explanation."""
 
 PERSONALISE_TEMPLATE = """
@@ -49,6 +52,41 @@ def _get_llm(fallback: bool = False):
 def _split_name(full_name: str) -> tuple[str, str]:
     parts = full_name.strip().split(" ", 1)
     return parts[0], parts[1] if len(parts) > 1 else ""
+
+
+_BRACKET_RE = re.compile(r"\[([^\[\]]{1,80})\]")
+
+
+def _strip_bracket_placeholders(text: str, ctx: dict[str, str]) -> str:
+    """
+    Catches bracketed placeholder text an LLM invents on its own (e.g.
+    "[Manager Name]", "[your manager's name]", "[Insert Name]") that the
+    prompt's curly-brace {manager_name}-style tokens didn't stop it from
+    writing — smaller/less-compliant models do this fairly often regardless
+    of instructions. Matched by keyword in the bracket content rather than
+    exact phrasing, since the model's wording varies; anything unrecognised
+    is dropped outright rather than left as an obviously-fake "[...]" marker
+    in a sent email.
+    """
+    def _resolve(m: re.Match) -> str:
+        phrase = m.group(1).lower()
+        if "manager" in phrase or "supervisor" in phrase or "boss" in phrase:
+            return ctx["manager_name"]
+        if "last name" in phrase or "surname" in phrase:
+            return ctx["last_name"]
+        if "full name" in phrase:
+            return ctx["full_name"]
+        if "first name" in phrase or "your name" in phrase:
+            return ctx["first_name"]
+        if "department" in phrase or "team" in phrase:
+            return ctx["department"]
+        if "job title" in phrase or "role" in phrase or "position" in phrase:
+            return ctx["job_title"]
+        if "company" in phrase or "organi" in phrase:  # organisation/organization
+            return ctx["company"]
+        return ""
+
+    return _BRACKET_RE.sub(_resolve, text)
 
 
 def _safe(value: str | None, default: str = "") -> str:
@@ -106,12 +144,24 @@ async def _personalise_one(
     )
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
+    ctx = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "full_name": full_name,
+        "department": department,
+        "job_title": job_title,
+        "manager_name": manager_name,
+        "company": organization_name,
+    }
+
     # Personalise subject too — simple string replacement. Must cover every
     # variable the template generator can emit, not just a subset — a
     # template using {last_name} or {manager_name} in the subject (common
     # for "before {last_name}" / "per {manager_name}'s request" phrasing)
-    # otherwise ships with the literal placeholder still in it.
-    personalised_subject = (
+    # otherwise ships with the literal placeholder still in it. Also catches
+    # any bracketed placeholder the LLM invented on its own, e.g. a subject
+    # like "Action required from [Manager Name]".
+    personalised_subject = _strip_bracket_placeholders(
         subject_template
         .replace("{first_name}", first_name)
         .replace("{last_name}", last_name)
@@ -119,7 +169,8 @@ async def _personalise_one(
         .replace("{department}", department)
         .replace("{job_title}", job_title)
         .replace("{manager_name}", manager_name)
-        .replace("{company}", organization_name)
+        .replace("{company}", organization_name),
+        ctx,
     )
 
     async with semaphore:
@@ -129,7 +180,7 @@ async def _personalise_one(
                 response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
                 return target_id, {
                     "subject": personalised_subject,
-                    "body": response.content.strip(),
+                    "body": _strip_bracket_placeholders(response.content.strip(), ctx),
                 }
             except Exception as e:
                 log.warning("personalisation_agent.llm_error", target_id=target_id, error=str(e))
@@ -137,13 +188,16 @@ async def _personalise_one(
                     # Fallback: naive replacement without LLM
                     return target_id, {
                         "subject": personalised_subject,
-                        "body": body_template
+                        "body": _strip_bracket_placeholders(
+                            body_template
                             .replace("{first_name}", first_name)
                             .replace("{last_name}", last_name)
                             .replace("{full_name}", full_name)
                             .replace("{department}", department)
                             .replace("{job_title}", job_title)
                             .replace("{manager_name}", manager_name),
+                            ctx,
+                        ),
                     }
 
 
