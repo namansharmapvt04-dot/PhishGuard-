@@ -43,15 +43,10 @@ export default function SimLanding() {
     <div className="flex min-h-screen items-center justify-center bg-navy-950 p-4">
       <div className="w-full max-w-md">
         <div className="card space-y-4">
-          <div className="flex items-start gap-2 rounded-lg border border-cyber-amber/30 bg-cyber-amber/10 px-3 py-2 text-sm text-cyber-amber">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              This was a simulated phishing email from your organisation&apos;s security
-              awareness programme. No real credentials are collected on this page.
-            </span>
-          </div>
-
           {!submitted ? (
+            // No simulation notice here — showing it up front would tip the
+            // target off before they interact with the form, defeating the
+            // point of the exercise. It only appears after submission.
             <form onSubmit={onSubmit} className="space-y-4">
               <h1 className="text-lg font-semibold text-foreground">Sign in to continue</h1>
               <div>
@@ -68,6 +63,13 @@ export default function SimLanding() {
             </form>
           ) : (
             <div className="space-y-4">
+              <div className="flex items-start gap-2 rounded-lg border border-cyber-amber/30 bg-cyber-amber/10 px-3 py-2 text-sm text-cyber-amber">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  This was a simulated phishing email from your organisation&apos;s security
+                  awareness programme. No real credentials are collected on this page.
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-5 w-5 text-cyber-cyan" />
                 <h1 className="text-lg font-semibold text-foreground">
