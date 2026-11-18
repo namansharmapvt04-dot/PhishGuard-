@@ -26,5 +26,8 @@ RUN python scripts/seed_chromadb.py
 EXPOSE 8000
 
 # Apply migrations, then start the API. $PORT is set by PaaS hosts (Render,
-# etc) at runtime; falls back to 8000 for local/compose use.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# etc) at runtime; falls back to 8000 for local/compose use. --workers 1
+# explicit (uvicorn already defaults to 1, but a second worker process would
+# double the ChromaDB ONNX MiniLM model's resident memory — on Render's free
+# 512MB tier that's the difference between fitting and getting OOM-killed).
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
