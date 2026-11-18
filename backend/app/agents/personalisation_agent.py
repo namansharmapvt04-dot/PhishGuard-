@@ -51,6 +51,24 @@ def _split_name(full_name: str) -> tuple[str, str]:
     return parts[0], parts[1] if len(parts) > 1 else ""
 
 
+def _safe(value: str | None, default: str = "") -> str:
+    """
+    Coerce a possibly-None/empty target field to a plain string.
+
+    `dict.get(key, default)` only falls back when the key is *missing* —
+    department/job_title/manager_name are nullable Postgres columns, so the
+    dict built from a Target row always has the key present, just with a
+    None value. str.replace()'s second argument must be a str, so passing
+    that None straight through crashes with
+    "TypeError: replace() argument 2 must be str, not None" the moment any
+    target has a blank optional field.
+    """
+    if value is None:
+        return default
+    value = str(value).strip()
+    return value or default
+
+
 # Caps how many targets get personalised concurrently — was a plain
 # sequential for-loop (one LLM call, then the next, then the next), which
 # made total time scale linearly with target count. Running them concurrently
@@ -68,8 +86,12 @@ async def _personalise_one(
     semaphore: asyncio.Semaphore,
 ) -> tuple[str, dict[str, str]]:
     target_id = str(target.get("id", target.get("email")))
-    full_name = target.get("full_name", "Employee")
+    full_name = _safe(target.get("full_name"), "Employee")
     first_name, last_name = _split_name(full_name)
+    department = _safe(target.get("department"), "your department")
+    job_title = _safe(target.get("job_title"), "team member")
+    manager_name = _safe(target.get("manager_name"), "your manager")
+    organization_name = _safe(organization_name, "the company")
 
     prompt = PERSONALISE_TEMPLATE.format(
         subject=subject_template,
@@ -77,9 +99,9 @@ async def _personalise_one(
         first_name=first_name,
         last_name=last_name,
         full_name=full_name,
-        department=target.get("department", "your department"),
-        job_title=target.get("job_title", "team member"),
-        manager_name=target.get("manager_name", "your manager"),
+        department=department,
+        job_title=job_title,
+        manager_name=manager_name,
         company=organization_name,
     )
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
@@ -94,9 +116,9 @@ async def _personalise_one(
         .replace("{first_name}", first_name)
         .replace("{last_name}", last_name)
         .replace("{full_name}", full_name)
-        .replace("{department}", target.get("department", ""))
-        .replace("{job_title}", target.get("job_title", ""))
-        .replace("{manager_name}", target.get("manager_name", ""))
+        .replace("{department}", department)
+        .replace("{job_title}", job_title)
+        .replace("{manager_name}", manager_name)
         .replace("{company}", organization_name)
     )
 
@@ -119,9 +141,9 @@ async def _personalise_one(
                             .replace("{first_name}", first_name)
                             .replace("{last_name}", last_name)
                             .replace("{full_name}", full_name)
-                            .replace("{department}", target.get("department", "your department"))
-                            .replace("{job_title}", target.get("job_title", ""))
-                            .replace("{manager_name}", target.get("manager_name", "your manager")),
+                            .replace("{department}", department)
+                            .replace("{job_title}", job_title)
+                            .replace("{manager_name}", manager_name),
                     }
 
 
@@ -136,9 +158,9 @@ async def personalisation_agent_node(state: AgentState) -> AgentState:
         log.warning("personalisation_agent.no_targets")
         return state
 
-    subject_template = state.get("email_subject", "")
-    body_template = state.get("email_body", "")
-    organization_name = state.get("organization_name", "the company")
+    subject_template = _safe(state.get("email_subject"))
+    body_template = _safe(state.get("email_body"))
+    organization_name = _safe(state.get("organization_name"), "the company")
     semaphore = asyncio.Semaphore(_PERSONALISE_CONCURRENCY)
 
     results = await asyncio.gather(*[

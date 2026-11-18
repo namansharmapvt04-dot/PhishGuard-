@@ -203,6 +203,12 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                 write_campaign = await write_db.get(Campaign, campaign_id)
                 if final_state.get("should_escalate"):
                     write_campaign.state = CampaignState.ESCALATED
+                    write_campaign.agent_metadata = {
+                        "escalation_reason": "realism_evaluator_max_retries",
+                        "ragas_score": final_state.get("ragas_score"),
+                        "retry_count": final_state.get("retry_count", 0),
+                        "eval_feedback": final_state.get("eval_feedback"),
+                    }
                     yield sse_format(SSEEvent.STATE_CHANGED, {"state": "ESCALATED"})
                 else:
                     write_campaign.email_subject = final_state.get("email_subject")
@@ -249,6 +255,15 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                 await write_db.rollback()
                 write_campaign = await write_db.get(Campaign, campaign_id)
                 write_campaign.state = CampaignState.ESCALATED
+                # Distinct from a genuine Realism Evaluator max-retries
+                # escalation (which sets no agent_metadata at all on this
+                # path) — both land in the same ESCALATED state, so without
+                # this marker there's no way to tell "the evaluator gave up"
+                # apart from "the pipeline crashed" after a page reload.
+                write_campaign.agent_metadata = {
+                    "escalation_reason": "pipeline_error",
+                    "error": str(e),
+                }
                 await write_db.commit()
                 yield sse_format(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
 

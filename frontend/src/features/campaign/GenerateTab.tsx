@@ -34,6 +34,13 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState('')
   const [finished, setFinished] = useState<null | 'completed' | 'failed'>(null)
+  // The real exception text from a `pipeline_failed` SSE event, if any. A
+  // genuine max-retries escalation (state_changed → ESCALATED, no crash)
+  // never sets this — only an unhandled exception in the pipeline does, so
+  // its presence is what distinguishes "the evaluator gave up" from "the
+  // app threw an error partway through", which otherwise look identical
+  // from the DB's point of view (both just end up in ESCALATED state).
+  const [errorDetail, setErrorDetail] = useState('')
   const cancelRef = useRef<(() => void) | null>(null)
   const logId = useRef(0)
 
@@ -124,11 +131,26 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
         )
         setFinished('completed')
         break
-      case 'pipeline_failed':
-        addLog(`Pipeline failed: ${d.error ?? 'unknown error'}`, 'bad')
-        setSteps((s) => ({ ...s, escalate: 'failed' }))
+      case 'pipeline_failed': {
+        const message = String(d.error ?? 'unknown error')
+        addLog(`Pipeline failed: ${message}`, 'bad')
+        // An unhandled exception can land mid-step — e.g. a crash inside
+        // Personalisation Agent after Realism Evaluator already passed
+        // leaves that step pre-marked 'active' with no node_completed ever
+        // arriving to resolve it. Don't wait for the stream to fully close
+        // (onDone) to stop the spinner; react to this event immediately.
+        setSteps((s) => {
+          const next = { ...s }
+          for (const key of Object.keys(next)) {
+            if (next[key] === 'active') next[key] = 'failed'
+          }
+          return next
+        })
+        setErrorDetail(message)
+        setRunning(false)
         setFinished('failed')
         break
+      }
       default:
         break
     }
@@ -139,6 +161,7 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
     setLog([])
     setSteps({})
     setFinished(null)
+    setErrorDetail('')
     setRunning(true)
 
     const onDone = () => {
@@ -259,12 +282,20 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
         <div className="card border-cyber-red/30">
           <div className="mb-2 flex items-center gap-2 text-cyber-red">
             <XCircle className="h-4 w-4" />
-            <span className="font-semibold">Generation didn't complete</span>
+            <span className="font-semibold">
+              {errorDetail ? 'Generation failed' : 'Escalated — all retries failed'}
+            </span>
           </div>
           <p className="text-sm text-slate-400">
-            {campaign.state === 'ESCALATED'
-              ? "The Realism Evaluator couldn't get a passing draft after the configured retry limit. This campaign needs manual review — edit the template yourself or hit “Re-generate” to try again from scratch."
-              : 'See the log above for details. Hit “Generate emails” to try again.'}
+            {errorDetail ? (
+              // A real exception, not a legitimate max-retries escalation —
+              // show what actually went wrong instead of guessing based on
+              // campaign.state (both cases land in the same ESCALATED state,
+              // so that alone can't tell them apart).
+              <>Error: <span className="text-foreground">{errorDetail}</span></>
+            ) : (
+              "The Realism Evaluator couldn't get a passing draft after the configured retry limit. This campaign needs manual review — edit the template yourself or hit “Re-generate” to try again from scratch."
+            )}
           </p>
         </div>
       )}

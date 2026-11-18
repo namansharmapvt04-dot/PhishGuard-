@@ -41,6 +41,11 @@ def _ensure_html(body: str) -> str:
 def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
     """Rewrite every link to go through the click-tracking redirect, and
     append the open-tracking pixel."""
+    if not base_url or not tracking_token:
+        raise ValueError(
+            f"inject_tracking requires both base_url and tracking_token "
+            f"(got base_url={base_url!r}, tracking_token={tracking_token!r})"
+        )
     body_html = _ensure_html(body_html)
     click_url = f"{base_url}/track/click/{tracking_token}"
     tracked = re.sub(r'href="[^"]*"', f'href="{click_url}"', body_html)
