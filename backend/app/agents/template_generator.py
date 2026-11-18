@@ -4,7 +4,6 @@ Generates the phishing email template using RAG few-shot patterns.
 Uses RAG + Few-Shot + Structured Output prompting.
 """
 import asyncio
-import json
 import structlog
 
 from langchain_groq import ChatGroq
@@ -13,6 +12,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
 from app.agents.state import AgentState
+from app.agents.json_utils import safe_json_loads
 
 log = structlog.get_logger(__name__)
 
@@ -80,11 +80,12 @@ async def template_generator_node(state: AgentState) -> AgentState:
 
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    for use_fallback in (False, True):
+    # Retry the primary model once before falling back — see campaign_planner.py.
+    for use_fallback in (False, False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
             response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
-            result = json.loads(response.content.strip())
+            result = safe_json_loads(response.content.strip())
             log.info("template_generator.done", subject=result.get("subject"))
             return {
                 **state,

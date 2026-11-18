@@ -4,7 +4,6 @@ Analyses the campaign config and reasons about the best attack strategy.
 Uses Role/Persona + Chain-of-Thought prompting.
 """
 import asyncio
-import json
 import structlog
 
 from langchain_groq import ChatGroq
@@ -13,6 +12,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
 from app.agents.state import AgentState
+from app.agents.json_utils import safe_json_loads
 from app.rag.vectorstore import retrieve_patterns
 
 log = structlog.get_logger(__name__)
@@ -84,14 +84,18 @@ async def campaign_planner_node(state: AgentState) -> AgentState:
 
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    for use_fallback in (False, True):
+    # Retry the primary model once before falling back — a malformed-JSON
+    # response is usually a one-off formatting glitch, not a reason to burn
+    # a call on the fallback provider (which commonly has no real API key
+    # configured at all, so it's a guaranteed failure, not a real fallback).
+    for use_fallback in (False, False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
             # request_timeout on the client is unreliable in this environment
             # (observed hanging indefinitely despite being set) — this is a
             # hard backstop that can't fail the same way.
             response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
-            plan = json.loads(response.content.strip())
+            plan = safe_json_loads(response.content.strip())
             log.info("campaign_planner.done", plan=plan)
             return {
                 **state,

@@ -13,6 +13,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
 from app.agents.state import AgentState
+from app.agents.json_utils import safe_json_loads
 
 log = structlog.get_logger(__name__)
 
@@ -57,11 +58,12 @@ async def insight_analyst_node(state: AgentState) -> AgentState:
     prompt = ANALYST_TEMPLATE.format(results_json=json.dumps(campaign_results, indent=2))
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    for use_fallback in (False, True):
+    # Retry the primary model once before falling back — see campaign_planner.py.
+    for use_fallback in (False, False, True):
         try:
             llm = _get_llm(fallback=use_fallback)
             response = await asyncio.wait_for(llm.ainvoke(messages), timeout=35)
-            insights = json.loads(response.content.strip())
+            insights = safe_json_loads(response.content.strip())
             log.info("insight_analyst.done", risk_level=insights.get("risk_level"))
             return {**state, "insights": insights, "error": None}
         except Exception as e:
