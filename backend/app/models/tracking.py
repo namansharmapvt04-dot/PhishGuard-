@@ -23,8 +23,10 @@ class TrackingEvent(Base):
 
     event_type: Mapped[EventType] = mapped_column(Enum(EventType), nullable=False, index=True)
 
-    # Captured context
-    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)   # supports IPv6
+    # Captured context — SHA-256 hex digest of the IP, never the raw address
+    # (the raw IP is enough to identify the real person on a small org's
+    # network; the hash still lets you dedupe/count distinct sources).
+    ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     geo_country: Mapped[str | None] = mapped_column(String(2), nullable=True)   # ISO 3166-1 alpha-2
 

@@ -14,7 +14,7 @@ from app.config import settings
 from app.api.auth import router as auth_router
 from app.api.campaigns import router as campaigns_router
 from app.api.targets import router as targets_router
-from app.api.tracking import router as tracking_router, landing_router
+from app.api.tracking import router as tracking_router
 
 log = structlog.get_logger(__name__)
 
@@ -64,7 +64,6 @@ app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(campaigns_router, prefix=API_PREFIX)
 app.include_router(targets_router, prefix=API_PREFIX)
 app.include_router(tracking_router)   # /track/* — no versioning prefix (links go in emails)
-app.include_router(landing_router)    # /phish/{token} — fake landing page, no versioning prefix
 
 # Uploaded campaign images (logos, screenshots pasted into the email body).
 _static_dir = Path("static")

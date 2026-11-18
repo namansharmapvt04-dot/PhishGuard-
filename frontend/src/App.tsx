@@ -11,6 +11,7 @@ import Results from './pages/Results'
 import Targets from './pages/Targets'
 import Analytics from './pages/Analytics'
 import Insights from './pages/Insights'
+import SimLanding from './pages/SimLanding'
 
 function Protected({ children }: { children: ReactNode }) {
   return (
@@ -26,6 +27,9 @@ export default function App() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      {/* Public — no auth, no Layout. This is where the simulated phishing
+          link in a target's email lands; they're not a PhishGuard user. */}
+      <Route path="/sim/:token" element={<SimLanding />} />
 
       <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
       <Route path="/campaigns" element={<Protected><CampaignList /></Protected>} />

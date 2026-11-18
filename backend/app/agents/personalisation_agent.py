@@ -84,11 +84,19 @@ async def _personalise_one(
     )
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    # Personalise subject too — simple string replacement
+    # Personalise subject too — simple string replacement. Must cover every
+    # variable the template generator can emit, not just a subset — a
+    # template using {last_name} or {manager_name} in the subject (common
+    # for "before {last_name}" / "per {manager_name}'s request" phrasing)
+    # otherwise ships with the literal placeholder still in it.
     personalised_subject = (
         subject_template
         .replace("{first_name}", first_name)
+        .replace("{last_name}", last_name)
+        .replace("{full_name}", full_name)
         .replace("{department}", target.get("department", ""))
+        .replace("{job_title}", target.get("job_title", ""))
+        .replace("{manager_name}", target.get("manager_name", ""))
         .replace("{company}", organization_name)
     )
 
