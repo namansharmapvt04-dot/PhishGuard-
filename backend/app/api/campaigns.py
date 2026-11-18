@@ -1,6 +1,8 @@
 """
 Campaign endpoints: CRUD + trigger generation pipeline + SSE progress stream.
 """
+import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -130,8 +132,18 @@ async def delete_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
 
 # ── Generation pipeline ─────────────────────────────────────────────────────
 
+def _progress_key(campaign_id: uuid.UUID) -> str:
+    return f"campaign:{campaign_id}:progress"
+
+
+# TTL for a campaign's stored progress log — generous enough to outlive any
+# realistic reconnect delay (tab switch, page reload) without lingering in
+# Redis indefinitely.
+_PROGRESS_TTL_SECONDS = 3600
+
+
 @router.post("/{campaign_id}/generate")
-async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     """
     Triggers the LangGraph 5-node pipeline. Streams SSE progress events.
     """
@@ -147,6 +159,12 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     # Transition to GENERATING immediately
     campaign.state = CampaignState.GENERATING
     await db.flush()
+
+    # Fresh run — drop any progress log left over from a prior generate/
+    # re-generate on this campaign so a reconnecting client never replays
+    # stale events mixed in with this run's.
+    progress_key = _progress_key(campaign_id)
+    await redis.delete(progress_key)
 
     # Gather targets for personalisation
     targets_result = await db.execute(
@@ -176,8 +194,17 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
         "error": None,
     }
 
+    async def _emit(event: str, data: dict) -> str:
+        # Persist every event this run emits so a client that reconnects
+        # mid-generation (tab switch, page reload) can replay everything
+        # it missed instead of starting from a blank log — see
+        # GET /{campaign_id}/generate/stream below.
+        await redis.rpush(progress_key, json.dumps({"event": event, "data": data}))
+        await redis.expire(progress_key, _PROGRESS_TTL_SECONDS)
+        return sse_format(event, data)
+
     async def event_stream():
-        yield sse_format(SSEEvent.PIPELINE_STARTED, {"campaign_id": str(campaign_id)})
+        yield await _emit(SSEEvent.PIPELINE_STARTED, {"campaign_id": str(campaign_id)})
 
         # FastAPI closes the `db` session (the Depends(DB) one above) as soon as
         # this endpoint function returns the StreamingResponse object — before
@@ -191,7 +218,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                     node_name = list(chunk.keys())[0] if chunk else None
                     if node_name:
                         node_state = chunk[node_name]
-                        yield sse_format(SSEEvent.NODE_COMPLETED, {
+                        yield await _emit(SSEEvent.NODE_COMPLETED, {
                             "node": node_name,
                             "ragas_score": node_state.get("ragas_score"),
                             "retry_count": node_state.get("retry_count", 0),
@@ -209,7 +236,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                         "retry_count": final_state.get("retry_count", 0),
                         "eval_feedback": final_state.get("eval_feedback"),
                     }
-                    yield sse_format(SSEEvent.STATE_CHANGED, {"state": "ESCALATED"})
+                    yield await _emit(SSEEvent.STATE_CHANGED, {"state": "ESCALATED"})
                 else:
                     write_campaign.email_subject = final_state.get("email_subject")
                     write_campaign.email_body = final_state.get("email_body")
@@ -242,8 +269,8 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                             target_row.personalised_subject = content.get("subject")
                             target_row.personalised_body = content.get("body")
 
-                    yield sse_format(SSEEvent.STATE_CHANGED, {"state": "READY"})
-                    yield sse_format(SSEEvent.PIPELINE_COMPLETED, {
+                    yield await _emit(SSEEvent.STATE_CHANGED, {"state": "READY"})
+                    yield await _emit(SSEEvent.PIPELINE_COMPLETED, {
                         "ragas_score": write_campaign.ragas_score,
                         "subject": write_campaign.email_subject,
                     })
@@ -265,9 +292,53 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
                     "error": str(e),
                 }
                 await write_db.commit()
-                yield sse_format(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
+                yield await _emit(SSEEvent.PIPELINE_FAILED, {"error": str(e)})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.get("/{campaign_id}/generate/stream")
+async def stream_generation_progress(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
+    """
+    Reconnects to an in-flight (or just-finished) generation run.
+
+    The pipeline itself is driven entirely by the POST /generate request's
+    own background generator — it keeps running server-side regardless of
+    whether any client is watching. This endpoint only replays the progress
+    log that generator wrote to Redis, then tails it for new events, so a
+    client that switched tabs or reloaded mid-run can resume watching
+    without restarting (or duplicating) generation.
+    """
+    await _get_campaign_or_404(campaign_id, current_user, db)
+    progress_key = _progress_key(campaign_id)
+
+    async def replay_stream():
+        cursor = 0
+        raw = await redis.lrange(progress_key, cursor, -1)
+        cursor += len(raw)
+        for item in raw:
+            evt = json.loads(item)
+            yield sse_format(evt["event"], evt["data"])
+
+        # Poll (no pub/sub infra in this app) for new events until the
+        # campaign leaves GENERATING. Capped so a client can't be left
+        # holding this connection open forever if something stalls.
+        for _ in range(600):  # ~10 minutes at 1s/poll
+            async with AsyncSessionLocal() as poll_db:
+                campaign = await poll_db.get(Campaign, campaign_id)
+            still_generating = campaign is not None and campaign.state == CampaignState.GENERATING
+
+            raw = await redis.lrange(progress_key, cursor, -1)
+            cursor += len(raw)
+            for item in raw:
+                evt = json.loads(item)
+                yield sse_format(evt["event"], evt["data"])
+
+            if not still_generating:
+                break
+            await asyncio.sleep(1)
+
+    return StreamingResponse(replay_stream(), media_type="text/event-stream")
 
 
 def _substitute_variables(text: str, target: Target, organization_name: str) -> str:

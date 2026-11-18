@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, CheckCircle2, XCircle, Loader2, RotateCcw, AlertCircle } from 'lucide-react'
 import { Campaign } from '../../api/campaigns'
 import { targetsApi } from '../../api/targets'
-import { streamGeneration, SSEMessage } from '../../lib/sse'
+import { streamGeneration, streamGenerationProgress, SSEMessage } from '../../lib/sse'
 import { RAGAS_THRESHOLD } from '../../lib/constants'
 import { isDemo, simulateGeneration } from '../../lib/demo'
 
@@ -29,7 +29,12 @@ interface LogEntry {
 
 export default function GenerateTab({ campaign }: { campaign: Campaign }) {
   const qc = useQueryClient()
-  const [running, setRunning] = useState(false)
+  // Lazy-initialised: if this component mounts (or remounts, e.g. after a
+  // page reload) while a generation run is already in progress, start in
+  // the "running" view immediately instead of flashing the "only available
+  // from DRAFT/ESCALATED" warning for a frame before the reconnect effect
+  // below catches up.
+  const [running, setRunning] = useState(() => campaign.state === 'GENERATING')
   const [steps, setSteps] = useState<Record<string, StepStatus>>({})
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState('')
@@ -41,8 +46,21 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
   // app threw an error partway through", which otherwise look identical
   // from the DB's point of view (both just end up in ESCALATED state).
   const [errorDetail, setErrorDetail] = useState('')
-  const cancelRef = useRef<(() => void) | null>(null)
   const logId = useRef(0)
+  // Only for demo mode's timer-based simulation — cleared on unmount so a
+  // left-running set of setTimeouts doesn't keep firing into state after
+  // the component is gone. The real streams (streamGeneration /
+  // streamGenerationProgress) manage their own lifetime and must NOT be
+  // tied to this component's mount/unmount — see the reconnect effect
+  // below for why.
+  const demoCancelRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    return () => demoCancelRef.current?.()
+  }, [])
+  // True while `start()`'s own POST stream is live in this tab — tells the
+  // reconnect effect below not to also attach, which would double up on
+  // every event.
+  const localRunRef = useRef(false)
 
   const { data: targets } = useQuery({
     queryKey: ['targets', campaign.id],
@@ -52,9 +70,52 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
   const canGenerate =
     ['DRAFT', 'ESCALATED'].includes(campaign.state) && (targets?.length ?? 0) > 0
 
+  // Auto-reconnect to a run already in progress — covers both a fresh
+  // mount while campaign.state is GENERATING (page reload) and the
+  // CampaignDetail tab panel being torn down and rebuilt (if it's ever not
+  // kept mounted). The real pipeline runs independently of this view: it's
+  // driven by the original POST /generate request server-side, so this
+  // only replays/tails that run's progress log — reconnecting never starts
+  // a second run.
+  const attachedRef = useRef(false)
   useEffect(() => {
-    return () => cancelRef.current?.()
-  }, [])
+    if (campaign.state !== 'GENERATING') {
+      attachedRef.current = false
+      return
+    }
+    // Already watching this exact run via the POST stream `start()` kicked
+    // off in this same tab — e.g. a stale query refetch landed mid-run and
+    // flipped campaign.state to GENERATING while that stream is still
+    // live. Attaching the reconnect GET here too would replay the same
+    // events a second time, producing duplicate log/step entries.
+    if (attachedRef.current || localRunRef.current) return
+    attachedRef.current = true
+
+    setRunning(true)
+    setFinished(null)
+
+    if (isDemo()) return
+
+    const controller = streamGenerationProgress(campaign.id, {
+      onMessage: handleMessage,
+      onError: (err) => {
+        setError(err.message)
+        setRunning(false)
+      },
+      onDone: () => {
+        setRunning(false)
+        qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
+        qc.invalidateQueries({ queryKey: ['campaigns'] })
+      },
+    })
+
+    // Safe to abort here — this is only a read-only view of the run, not
+    // what drives it. If the tab unmounts, the pipeline keeps going
+    // server-side; reconnecting again later just replays from where this
+    // left off.
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.id, campaign.state])
 
   function addLog(text: string, tone: LogEntry['tone'] = 'info') {
     setLog((l) => [...l, { id: logId.current++, text, tone }])
@@ -163,28 +224,34 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
     setFinished(null)
     setErrorDetail('')
     setRunning(true)
+    localRunRef.current = true
 
     const onDone = () => {
+      localRunRef.current = false
       setRunning(false)
       qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
       qc.invalidateQueries({ queryKey: ['campaigns'] })
     }
 
     if (isDemo()) {
-      cancelRef.current = simulateGeneration(campaign.id, { onMessage: handleMessage, onDone })
+      demoCancelRef.current = simulateGeneration(campaign.id, { onMessage: handleMessage, onDone })
       return
     }
 
-    const controller = streamGeneration(campaign.id, {
+    // Deliberately not stored for cancel-on-unmount: this request drives
+    // the pipeline itself. If the user switches tabs mid-generation, the
+    // run must keep going server-side — the reconnect effect above is what
+    // picks the view back up, not this controller.
+    streamGeneration(campaign.id, {
       onMessage: handleMessage,
       onError: (err) => {
+        localRunRef.current = false
         setError(err.message)
         setRunning(false)
         qc.invalidateQueries({ queryKey: ['campaign', campaign.id] })
       },
       onDone,
     })
-    cancelRef.current = () => controller.abort()
   }
 
   return (

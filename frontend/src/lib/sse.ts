@@ -5,28 +5,25 @@ export interface SSEMessage {
   data: Record<string, unknown>
 }
 
+interface StreamHandlers {
+  onMessage: (msg: SSEMessage) => void
+  onError?: (err: Error) => void
+  onDone?: () => void
+}
+
 /**
- * The backend exposes campaign generation as an authenticated POST that streams
- * `text/event-stream`. The native EventSource API only does GET and can't send
- * an Authorization header, so we consume the stream with fetch + a reader and
- * parse SSE frames ("event:" / "data:") by hand.
- *
- * Returns an AbortController so the caller can cancel the stream on unmount.
+ * Shared frame-consuming loop for both the one-shot generation POST and the
+ * reconnect GET below. Neither can use the native EventSource API — it only
+ * does GET and can't send an Authorization header — so both consume
+ * `text/event-stream` via fetch + a reader and parse SSE frames by hand.
  */
-export function streamGeneration(
-  campaignId: string,
-  handlers: {
-    onMessage: (msg: SSEMessage) => void
-    onError?: (err: Error) => void
-    onDone?: () => void
-  },
-): AbortController {
+function streamRequest(url: string, method: 'GET' | 'POST', handlers: StreamHandlers): AbortController {
   const controller = new AbortController()
 
   ;(async () => {
     try {
-      const res = await fetch(`${API_PREFIX}/campaigns/${campaignId}/generate`, {
-        method: 'POST',
+      const res = await fetch(url, {
+        method,
         headers: {
           Accept: 'text/event-stream',
           Authorization: tokenStore.access ? `Bearer ${tokenStore.access}` : '',
@@ -35,7 +32,7 @@ export function streamGeneration(
       })
 
       if (!res.ok || !res.body) {
-        let detail = `Generation failed (HTTP ${res.status})`
+        let detail = `Request failed (HTTP ${res.status})`
         try {
           const body = await res.json()
           if (body?.detail) detail = String(body.detail)
@@ -71,6 +68,26 @@ export function streamGeneration(
   })()
 
   return controller
+}
+
+/**
+ * Starts a brand-new generation run. Returns an AbortController, but the
+ * caller should NOT abort this on unmount — the pipeline is driven by this
+ * same request on the server; cancelling it stops generation outright, not
+ * just the UI's view of it. Aborting is only for an explicit user cancel.
+ */
+export function streamGeneration(campaignId: string, handlers: StreamHandlers): AbortController {
+  return streamRequest(`${API_PREFIX}/campaigns/${campaignId}/generate`, 'POST', handlers)
+}
+
+/**
+ * Reconnects to a generation run already in progress (or just finished) —
+ * replays everything logged so far, then tails new events. Safe to abort
+ * freely (e.g. on unmount): it's a read-only view, not what drives the
+ * pipeline.
+ */
+export function streamGenerationProgress(campaignId: string, handlers: StreamHandlers): AbortController {
+  return streamRequest(`${API_PREFIX}/campaigns/${campaignId}/generate/stream`, 'GET', handlers)
 }
 
 function parseFrame(frame: string): SSEMessage | null {

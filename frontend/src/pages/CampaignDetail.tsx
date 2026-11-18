@@ -30,6 +30,10 @@ export default function CampaignDetail() {
     queryKey: ['campaign', id],
     queryFn: () => campaignsApi.get(id),
     enabled: !!id,
+    // Safety net alongside the Generate tab's own SSE stream: keeps the
+    // state badge and the rest of the page in sync even if that stream
+    // drops, until generation lands on a terminal state.
+    refetchInterval: (query) => (query.state.data?.state === 'GENERATING' ? 3000 : false),
   })
 
   if (isLoading) return <Spinner full label="Loading campaign…" />
@@ -75,12 +79,30 @@ export default function CampaignDetail() {
         ))}
       </div>
 
+      {/*
+        Kept mounted (hidden via CSS) rather than conditionally rendered —
+        switching away from the Generate tab mid-run must not unmount it:
+        that would drop its live SSE connection and local pipeline-progress
+        state, surfacing as "Generation is only available from DRAFT or
+        ESCALATED" when the user switches back despite generation still
+        running server-side.
+      */}
       <div>
-        {tab === 'overview' && <OverviewTab campaign={campaign} />}
-        {tab === 'targets' && <TargetsTab campaignId={campaign.id} state={campaign.state} />}
-        {tab === 'generate' && <GenerateTab campaign={campaign} />}
-        {tab === 'preview' && <EmailPreviewTab campaign={campaign} />}
-        {tab === 'actions' && <ActionsTab campaign={campaign} />}
+        <div className={tab === 'overview' ? '' : 'hidden'}>
+          <OverviewTab campaign={campaign} />
+        </div>
+        <div className={tab === 'targets' ? '' : 'hidden'}>
+          <TargetsTab campaignId={campaign.id} state={campaign.state} />
+        </div>
+        <div className={tab === 'generate' ? '' : 'hidden'}>
+          <GenerateTab campaign={campaign} />
+        </div>
+        <div className={tab === 'preview' ? '' : 'hidden'}>
+          <EmailPreviewTab campaign={campaign} />
+        </div>
+        <div className={tab === 'actions' ? '' : 'hidden'}>
+          <ActionsTab campaign={campaign} />
+        </div>
       </div>
     </div>
   )
