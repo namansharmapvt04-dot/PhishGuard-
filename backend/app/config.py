@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -41,10 +42,21 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
-    # Email sending (Brevo transactional API)
-    BREVO_API_KEY: str = ""
-    BREVO_SENDER_EMAIL: str = ""
-    BREVO_DAILY_LIMIT: int = 300
+    # Email sending (Gmail SMTP — Brevo's transactional API was stuck in an
+    # unexplained "sending platform disabled" state with no error detail, so
+    # this app sends through a regular Gmail account + App Password instead)
+    GMAIL_ADDRESS: str = ""
+    GMAIL_APP_PASSWORD: str = ""
+    # Gmail's own cap is ~500 recipients/day on a free account; stay under it.
+    EMAIL_DAILY_LIMIT: int = 450
+
+    @field_validator("GMAIL_APP_PASSWORD")
+    @classmethod
+    def _strip_app_password_spaces(cls, v: str) -> str:
+        # Google's UI displays the code as "xxxx xxxx xxxx xxxx" for
+        # readability, but the real password has no spaces — strip them so a
+        # literal copy-paste from the Google Account page still works.
+        return v.replace(" ", "")
 
     # App
     ENVIRONMENT: str = "development"

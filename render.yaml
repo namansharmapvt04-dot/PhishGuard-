@@ -27,9 +27,9 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: BREVO_API_KEY
+      - key: GMAIL_ADDRESS
         sync: false
-      - key: BREVO_SENDER_EMAIL
+      - key: GMAIL_APP_PASSWORD
         sync: false
       - key: FRONTEND_URL
         sync: false   # your Vercel URL(s), comma-separated
@@ -45,8 +45,8 @@ services:
         value: 0.75
       - key: MAX_RETRIES
         value: 2
-      - key: BREVO_DAILY_LIMIT
-        value: 300
+      - key: EMAIL_DAILY_LIMIT
+        value: 450
       - key: TRACKING_WINDOW_DAYS
         value: 14
 

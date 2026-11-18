@@ -1,17 +1,19 @@
 """
-Outbound email via Brevo's transactional email API.
-https://developers.brevo.com/reference/sendtransacemail
+Outbound email via Gmail SMTP (a regular Gmail account + App Password).
+https://support.google.com/accounts/answer/185833
 """
 import re
+from email.message import EmailMessage
 
-import httpx
+import aiosmtplib
 import structlog
 
 from app.config import settings
 
 log = structlog.get_logger(__name__)
 
-BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+GMAIL_SMTP_HOST = "smtp.gmail.com"
+GMAIL_SMTP_PORT = 587
 
 
 class MailerNotConfigured(Exception):
@@ -54,22 +56,27 @@ async def send_email(
     html_body: str,
     sender_name: str,
 ) -> None:
-    if not settings.BREVO_API_KEY or not settings.BREVO_SENDER_EMAIL:
-        raise MailerNotConfigured("BREVO_API_KEY / BREVO_SENDER_EMAIL not set")
+    if not settings.GMAIL_ADDRESS or not settings.GMAIL_APP_PASSWORD:
+        raise MailerNotConfigured("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set")
 
-    payload = {
-        "sender": {"name": sender_name or "PhishGuard", "email": settings.BREVO_SENDER_EMAIL},
-        "to": [{"email": to_email, "name": to_name}],
-        "subject": subject,
-        "htmlContent": html_body,
-    }
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.post(
-            BREVO_SEND_URL,
-            json=payload,
-            headers={"api-key": settings.BREVO_API_KEY, "content-type": "application/json"},
+    message = EmailMessage()
+    message["From"] = f"{sender_name or 'PhishGuard'} <{settings.GMAIL_ADDRESS}>"
+    message["To"] = f"{to_name} <{to_email}>" if to_name else to_email
+    message["Subject"] = subject
+    message.set_content("This email requires an HTML-capable client to view.")
+    message.add_alternative(html_body, subtype="html")
+
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=GMAIL_SMTP_HOST,
+            port=GMAIL_SMTP_PORT,
+            start_tls=True,
+            username=settings.GMAIL_ADDRESS,
+            password=settings.GMAIL_APP_PASSWORD,
+            timeout=20,
         )
-    if resp.status_code >= 300:
-        log.warning("mailer.send_failed", status=resp.status_code, body=resp.text[:300], to=to_email)
-        raise MailerError(f"Brevo {resp.status_code}: {resp.text[:300]}")
+    except aiosmtplib.SMTPException as e:
+        log.warning("mailer.send_failed", error=str(e), to=to_email)
+        raise MailerError(f"Gmail SMTP error: {e}") from e
     log.info("mailer.sent", to=to_email)

@@ -82,7 +82,7 @@ export default function ActionsTab({ campaign }: { campaign: Campaign }) {
               <Send className="h-4 w-4 text-cyber-blue" /> Launch campaign
             </h3>
             <p className="mt-1 text-sm text-slate-400">
-              Sends the generated email to every pending target via Brevo. Throttled to the
+              Sends the generated email to every pending target via Gmail. Throttled to the
               free-tier daily cap — call again later if some targets are deferred.
             </p>
           </div>

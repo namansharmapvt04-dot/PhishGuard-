@@ -275,15 +275,15 @@ def _substitute_variables(text: str, target: Target, organization_name: str) -> 
 
 async def _reserve_quota(redis: Redis, count: int) -> int:
     """
-    Atomically reserves up to `count` sends against today's Brevo free-tier
-    daily cap, tracked in Redis (keyed by UTC date, auto-expires next day).
-    Returns how many were actually reserved (may be less than `count`, or 0).
+    Atomically reserves up to `count` sends against today's Gmail daily cap,
+    tracked in Redis (keyed by UTC date, auto-expires next day). Returns how
+    many were actually reserved (may be less than `count`, or 0).
     """
     key = f"email_quota:{datetime.now(timezone.utc).date().isoformat()}"
     used = await redis.incrby(key, count)
     await redis.expire(key, 90000)  # ~25h, so it always outlives "today"
-    if used > settings.BREVO_DAILY_LIMIT:
-        over = used - settings.BREVO_DAILY_LIMIT
+    if used > settings.EMAIL_DAILY_LIMIT:
+        over = used - settings.EMAIL_DAILY_LIMIT
         reserved = count - over
         await redis.decrby(key, over)  # give back what we couldn't use
         return max(0, reserved)
@@ -294,7 +294,7 @@ async def _reserve_quota(redis: Redis, count: int) -> int:
 async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     """
     Sends the generated, personalised email to every PENDING target via
-    Brevo, throttled to the free-tier daily cap. Safe to call again later
+    Gmail SMTP, throttled to the free-tier daily cap. Safe to call again later
     (e.g. the next day) to keep working through a target list bigger than
     one day's quota — already-SENT targets are skipped.
     """
