@@ -27,16 +27,24 @@ CALL-TO-ACTION LINK — CRITICAL:
   "https://accounts.anycompany.com/...", no made-up domains at all). Any
   website your training examples show is for *style* only, never copy a
   URL from them.
-- For the clickable link/button in the email, use the EXACT literal text
-  {TRACKING_LINK} as the href value and nowhere else, e.g.:
-  <a href="{TRACKING_LINK}">Verify my account</a>
+- {TRACKING_LINK} must ALWAYS appear as the href value of a real HTML
+  anchor tag — <a href="{TRACKING_LINK}">Verify my account</a> — and
+  NEVER as bare text in a sentence (not "Click {TRACKING_LINK} to
+  verify", which leaves it as literal unclickable text in the sent
+  email). It must appear in the body exactly once, inside exactly one
+  <a href="{TRACKING_LINK}">...</a> tag.
   The real tracking link is substituted in automatically after you write
   the email — you never see or produce the real URL yourself.
 
 PLACEHOLDERS — CRITICAL:
 - Only use the exact curly-brace tokens {first_name}, {last_name},
   {full_name}, {department}, {job_title}, {manager_name}, {company},
-  {TRACKING_LINK}.
+  {TRACKING_LINK}. Do not invent variants or new ones of your own, e.g.
+  {IT_Support_Manager}, {CEO_Name}, or any other curly-brace token not in
+  this exact list — there is no data behind an invented token, so it
+  would show up as literal raw text in the sent email. If you need
+  something not on this list, write natural prose instead (e.g. "your
+  manager" rather than a made-up token).
 - NEVER invent your own bracketed placeholder text like
   "[Manager Name]", "[your manager's name]", or "[Insert Name]" — if you
   don't have a token for something, write natural prose instead.
@@ -58,7 +66,9 @@ never copy a URL/domain from these into your output):
 
 Using the attack plan and the examples above as style guides, write a phishing email.
 Use these template variables where appropriate: {{first_name}}, {{last_name}}, {{department}}, {{company}}, {{manager_name}}
-For the call-to-action link, use exactly {{TRACKING_LINK}} as the href value — never a real or invented URL.
+For the call-to-action link: write exactly one <a href="{{TRACKING_LINK}}">...</a> anchor tag
+in the body — {{TRACKING_LINK}} must be inside that href attribute, never written as
+plain text in a sentence, never a real or invented URL, and never repeated elsewhere.
 
 Output ONLY this JSON:
 {{

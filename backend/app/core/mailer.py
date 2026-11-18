@@ -40,6 +40,17 @@ def _ensure_html(body: str) -> str:
 
 _HREF_RE = re.compile(r'href\s*=\s*(["\'])(.*?)\1', re.IGNORECASE | re.DOTALL)
 _BARE_URL_RE = re.compile(r'https?://[^\s<>"\')]+', re.IGNORECASE)
+# Matches {TRACKING_LINK} or {{TRACKING_LINK}} written as plain prose, not
+# inside an href — by the time this runs, _HREF_RE above has already
+# rewritten any properly-formed `<a href="{TRACKING_LINK}">`, so whatever
+# still matches this must be bare text the model wrote outside a tag.
+_TRACKING_PLACEHOLDER_RE = re.compile(r"\{\{?TRACKING_LINK\}\}?", re.IGNORECASE)
+# Catches any other unresolved curly-brace token the model invented beyond
+# the officially supported set (e.g. "{IT_Support_Manager}") — personalisation_agent.py
+# only ever substitutes the tokens it knows about via plain .replace(), so an
+# invented one survives all the way here untouched. Run last, after the
+# TRACKING_LINK-specific handling above, so it can never eat that one first.
+_ANY_PLACEHOLDER_RE = re.compile(r"\{[A-Za-z0-9_]+\}")
 
 
 def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
@@ -72,13 +83,30 @@ def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
     # out anything that still looks like a URL after the href pass too.
     tracked = _BARE_URL_RE.sub(lambda m: click_url if m.group(0) != click_url else m.group(0), tracked)
 
-    # Last-resort guarantee: if the body had neither an href nor a bare URL
-    # at all (the model ignored the {TRACKING_LINK} instruction entirely and
-    # wrote plain prose), both passes above are no-ops and the email would
-    # ship with zero clickable link — defeating the whole simulation. Append
-    # an explicit CTA rather than let that happen silently.
+    # The bug this fixes: the model sometimes writes {TRACKING_LINK} as
+    # plain prose ("Click {TRACKING_LINK} to verify...") instead of inside
+    # an <a href>. Neither pass above touches that — it's not an href and
+    # not a bare URL — so it used to survive into the sent email as raw
+    # text *and* trigger the fallback CTA below, shipping two links. Turn
+    # it into a real anchor here so the fallback check after this sees the
+    # link already present and skips.
+    tracked = _TRACKING_PLACEHOLDER_RE.sub(f'<a href="{click_url}">Click here to verify</a>', tracked)
+
+    # Last-resort guarantee: if the body had neither an href, a bare URL,
+    # nor even {TRACKING_LINK} text at all (the model ignored the
+    # instruction entirely), every pass above is a no-op and the email
+    # would ship with zero clickable link — defeating the whole simulation.
+    # Append an explicit CTA rather than let that happen silently.
     if click_url not in tracked:
         tracked += f'<p><a href="{click_url}">Verify Account Details</a></p>'
+
+    # Final sweep: strip any other unresolved {PLACEHOLDER} the model
+    # invented (anything beyond the known template variables, which
+    # personalisation_agent.py has already substituted by this point) so a
+    # stray raw token can never leak into an outbound email. Safe to run
+    # now — the real tracking link above is already a plain URL with no
+    # braces in it.
+    tracked = _ANY_PLACEHOLDER_RE.sub("", tracked)
 
     pixel = f'<img src="{base_url}/track/open/{tracking_token}" width="1" height="1" style="display:none" alt="">'
     return f"{tracked}{pixel}"

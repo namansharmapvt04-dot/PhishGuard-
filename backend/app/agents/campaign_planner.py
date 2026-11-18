@@ -20,6 +20,21 @@ log = structlog.get_logger(__name__)
 SYSTEM_PROMPT = """You are an expert red-team social engineer and phishing consultant.
 Your role is to analyse a phishing campaign brief and produce a precise attack plan.
 Think step-by-step before producing your final JSON output.
+
+SENDER NAME — CRITICAL:
+- Invent a fresh, realistic Indian corporate full name for "sender_name" on
+  every single campaign — vary it every time, never settle into a repeated
+  default. Draw on names in the same style as (not limited to, and not
+  always exactly) Rohan Kulkarni, Ananya Deshmukh, Vikramaditya Nair, Sneha
+  Iyer, Karthik Subramanian, Priya Menon, Arjun Malhotra — mix first and
+  last names freely rather than reusing these verbatim every time.
+- NEVER use generic placeholder names like "John Doe", "Jane Smith", "John
+  Smith", or any other obviously-fake example name.
+- "sender_email" must be a plausible corporate address built from that same
+  name/role (e.g. first-initial.lastname@domain, or role-based like
+  it.support@domain) — matched to the persona's role, not a hardcoded
+  address from an example.
+
 Your output must be ONLY valid JSON — no markdown, no explanation outside the JSON."""
 
 PLANNER_TEMPLATE = """
@@ -37,7 +52,7 @@ Step-by-step reasoning:
 Output ONLY this JSON:
 {{
   "sender_persona": "brief description of who the sender pretends to be",
-  "sender_name": "Full Name of the spoofed sender",
+  "sender_name": "a freshly invented, realistic Indian full name for this campaign's spoofed sender — vary it every time, never a generic placeholder like John Doe",
   "sender_email": "realistic@{domain}",
   "urgency_trigger": "the specific event that makes this urgent",
   "fear_factor": "the emotion/fear being exploited",

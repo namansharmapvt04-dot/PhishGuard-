@@ -23,6 +23,15 @@ function ensureHtml(body: string): string {
 }
 
 // The backend template uses these placeholders (see template_generator.py).
+// The real tracking link only exists once a target is sent to — the backend
+// never exposes a target's secret tracking_token to the frontend at all, so
+// this is a clearly-fake sample URL for preview purposes only, not a live
+// link. Matches the path shape mailer.py's inject_tracking() produces.
+function sampleTrackingLink(t: Target | null): string {
+  const sampleToken = t ? `preview-${t.id}` : 'preview-token'
+  return `${window.location.origin}/track/click/${sampleToken}`
+}
+
 function personalise(text: string, t: Target | null, company: string): string {
   const [first, ...rest] = (t?.full_name ?? '').split(' ')
   const map: Record<string, string> = {
@@ -33,8 +42,14 @@ function personalise(text: string, t: Target | null, company: string): string {
     job_title: t?.job_title ?? '',
     manager_name: t?.manager_name ?? '',
     company,
+    TRACKING_LINK: sampleTrackingLink(t),
   }
-  return text.replace(/\{(\w+)\}/g, (m, key: string) => (key in map ? map[key] : m))
+  const resolved = text.replace(/\{\{?(\w+)\}\}?/g, (m, key: string) => (key in map ? map[key] : m))
+  // Anything left over is a placeholder the model invented that isn't a
+  // real supported token (e.g. {IT_Support_Manager}) — strip it rather
+  // than show raw {...} text in the preview, matching what mailer.py does
+  // right before actually sending.
+  return resolved.replace(/\{\{?[A-Za-z0-9_]+\}\}?/g, '')
 }
 
 export default function EmailPreviewTab({ campaign }: { campaign: Campaign }) {
