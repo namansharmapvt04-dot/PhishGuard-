@@ -17,6 +17,7 @@ from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB, Redis
 from app.core.cache import cache_get, cache_set, cache_invalidate
 from app.models.campaign import Campaign, CampaignState
+from app.models.user import Organization
 from app.models.target import Target, TargetStatus
 from app.models.tracking import TrackingEvent, EventType
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut, CampaignStats
@@ -177,10 +178,13 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
     if campaign.state not in (CampaignState.DRAFT, CampaignState.ESCALATED):
         raise HTTPException(status_code=400, detail=f"Cannot generate in state: {campaign.state}")
 
-    # organization is a lazy relationship — load it before touching it below,
-    # same pattern used in auth.me / register (async lazy-load needs an
-    # explicit refresh; a bare attribute access raises MissingGreenlet).
-    await db.refresh(current_user, ["organization"])
+    # current_user may be the lightweight cached AuthUser rather than an
+    # ORM-attached row (see dependencies.py), so it can't be passed to
+    # db.refresh() to lazy-load .organization — query the name directly by
+    # organization_id instead, which works the same either way.
+    org_result = await db.execute(select(Organization).where(Organization.id == current_user.organization_id))
+    organization = org_result.scalar_one_or_none()
+    organization_name = organization.name if organization else "Company"
 
     # Transition to GENERATING immediately
     campaign.state = CampaignState.GENERATING
@@ -211,7 +215,7 @@ async def generate_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, d
 
     initial_state: AgentState = {
         "campaign_id": str(campaign_id),
-        "organization_name": current_user.organization.name if hasattr(current_user, "organization") else "Company",
+        "organization_name": organization_name,
         "target_department": campaign.target_department or "all departments",
         "attack_vector": campaign.attack_vector or "credential harvesting",
         "urgency_level": campaign.urgency_level or "medium",
@@ -422,8 +426,12 @@ async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db:
     if not campaign.email_subject or not campaign.email_body:
         raise HTTPException(status_code=400, detail="No generated email to send — run Generate first")
 
-    await db.refresh(current_user, ["organization"])
-    organization_name = current_user.organization.name
+    # current_user may be the lightweight cached AuthUser (see
+    # dependencies.py) — not ORM-attached, so db.refresh() won't work here;
+    # look the organization up directly instead.
+    org_result = await db.execute(select(Organization).where(Organization.id == current_user.organization_id))
+    organization = org_result.scalar_one_or_none()
+    organization_name = organization.name if organization else "the company"
 
     pending_result = await db.execute(
         select(Target).where(Target.campaign_id == campaign_id, Target.status == TargetStatus.PENDING)

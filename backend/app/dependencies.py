@@ -12,8 +12,9 @@ from sqlalchemy import select
 import redis.asyncio as aioredis
 
 from app.database import get_db
-from app.core.security import decode_token
-from app.models.user import User
+from app.core.security import decode_token, AuthUser
+from app.core.cache import cache_get, cache_set, cache_invalidate
+from app.models.user import User, UserRole
 from app.config import settings
 
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -46,10 +47,25 @@ async def get_redis() -> aioredis.Redis:
 
 # ── Auth dependency ─────────────────────────────────────────────────────────
 
+# Every authenticated request pays for this lookup, so caching it directly
+# attacks the floor every endpoint otherwise shares — see core/cache.py's
+# module docstring for the fail-open contract this relies on. Short TTL so
+# a deactivation/role change (nothing currently does either, but see
+# invalidate_auth_cache below) self-heals quickly even if an invalidation
+# call were ever missed.
+AUTH_CACHE_TTL_SECONDS = 60
+
+
+async def invalidate_auth_cache(redis: aioredis.Redis, user_id: uuid.UUID | str) -> None:
+    """Call after logout, password change, role update, or deactivation."""
+    await cache_invalidate(redis, "authuser", str(user_id))
+
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> User:
+    redis: Annotated[aioredis.Redis, Depends(get_redis)],
+) -> User | AuthUser:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
@@ -65,19 +81,44 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
+    cached = await cache_get(redis, "authuser", user_id)
+    if cached is not None:
+        if not cached.get("is_active"):
+            raise credentials_exception
+        return AuthUser(
+            id=uuid.UUID(cached["id"]),
+            email=cached["email"],
+            full_name=cached["full_name"],
+            role=UserRole(cached["role"]),
+            organization_id=uuid.UUID(cached["organization_id"]),
+            is_active=cached["is_active"],
+        )
+
     result = await db.execute(
         select(User).where(User.id == uuid.UUID(user_id), User.is_active == True)
     )
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+
+    await cache_set(
+        redis, "authuser", user_id,
+        value={
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role.value,
+            "organization_id": str(user.organization_id),
+            "is_active": user.is_active,
+        },
+        ttl=AUTH_CACHE_TTL_SECONDS,
+    )
     return user
 
 
 async def get_current_admin(
-    current_user: Annotated[User, Depends(get_current_user)],
-) -> User:
-    from app.models.user import UserRole
+    current_user: Annotated["User | AuthUser", Depends(get_current_user)],
+) -> "User | AuthUser":
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -87,7 +128,7 @@ async def get_current_admin(
 
 
 # Convenience type aliases
-CurrentUser = Annotated[User, Depends(get_current_user)]
-AdminUser = Annotated[User, Depends(get_current_admin)]
+CurrentUser = Annotated["User | AuthUser", Depends(get_current_user)]
+AdminUser = Annotated["User | AuthUser", Depends(get_current_admin)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 Redis = Annotated[aioredis.Redis, Depends(get_redis)]

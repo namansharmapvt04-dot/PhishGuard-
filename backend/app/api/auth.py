@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 import structlog
 
-from app.dependencies import CurrentUser, DB, Redis
+from app.dependencies import CurrentUser, DB, Redis, invalidate_auth_cache
 from app.models.user import User, Organization
 from app.schemas.auth import UserRegister, UserLogin, UserOut, TokenPair, RefreshRequest, AccessToken
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
@@ -109,10 +109,19 @@ async def refresh_token(payload: RefreshRequest, db: DB, redis: Redis):
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(current_user: CurrentUser, redis: Redis):
     await redis.delete(f"{REFRESH_PREFIX}{current_user.id}")
+    await invalidate_auth_cache(redis, current_user.id)
     log.info("auth.logout", user_id=str(current_user.id))
 
 
 @router.get("/me", response_model=UserOut)
 async def me(current_user: CurrentUser, db: DB):
-    await db.refresh(current_user, ["organization"])
-    return current_user
+    # current_user may be the lightweight cached AuthUser (not an
+    # ORM-attached row, so it can't be passed to db.refresh()) — this
+    # endpoint's whole job is the authoritative profile including the
+    # organization relationship, so it queries fresh regardless of cache.
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.refresh(user, ["organization"])
+    return user

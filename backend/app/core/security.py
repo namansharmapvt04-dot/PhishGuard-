@@ -1,12 +1,37 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.config import settings
+from app.models.user import UserRole
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+@dataclass(frozen=True)
+class AuthUser:
+    """
+    Lightweight, read-only stand-in for the full `User` ORM row. On an
+    `auth:user:{id}` Redis cache hit, `get_current_user` (dependencies.py)
+    returns one of these instead of querying Postgres — it carries every
+    primitive field a route handler actually reads off `current_user`
+    (confirmed by grepping every `current_user.<attr>` access in app/).
+
+    It is NOT attached to any SQLAlchemy session, so it can't be passed to
+    `db.refresh()` or used to access the `organization` lazy relationship —
+    the two call sites that needed that (campaigns.py's generate/launch)
+    now query Organization directly by `organization_id` instead, which
+    works identically whether `current_user` is this or the real ORM row.
+    """
+    id: uuid.UUID
+    email: str
+    full_name: str
+    role: UserRole
+    organization_id: uuid.UUID
+    is_active: bool
 
 
 # ── Password helpers ────────────────────────────────────────────────────────
