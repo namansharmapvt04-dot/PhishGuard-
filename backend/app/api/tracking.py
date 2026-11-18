@@ -75,7 +75,28 @@ async def track_open(token: str, request: Request):
 @router.get("/click/{token}")
 async def track_click(token: str, request: Request):
     """Records link click and redirects to the simulation landing page."""
-    await _record_event(token, EventType.LINK_CLICKED, request)
+    # A click proves the email was seen even if the open pixel never fired
+    # (many clients block remote images by default but still let the user
+    # click a link) — without this, "opened" under-counts real engagement.
+    target = await _record_event(token, EventType.LINK_CLICKED, request)
+    if target:
+        async for db in get_db():
+            already_opened = await db.execute(
+                select(TrackingEvent).where(
+                    TrackingEvent.target_id == target.id,
+                    TrackingEvent.event_type == EventType.EMAIL_OPENED,
+                )
+            )
+            if already_opened.scalar_one_or_none() is None:
+                db.add(TrackingEvent(
+                    event_type=EventType.EMAIL_OPENED,
+                    ip_hash=_hash_ip(request.client.host if request.client else None),
+                    user_agent=request.headers.get("user-agent"),
+                    campaign_id=target.campaign_id,
+                    target_id=target.id,
+                ))
+                await db.commit()
+            break
     # The landing/debrief page is a real frontend route (SimLanding.tsx, not
     # server-rendered here) so it shares the app's styling and can call back
     # into the API client the same way the rest of the SPA does.

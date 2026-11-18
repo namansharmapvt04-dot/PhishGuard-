@@ -65,6 +65,24 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
         const label = NODE_LABELS[node] ?? node
         const score = d.ragas_score as number | null | undefined
         const retry = (d.retry_count as number) ?? 0
+
+        if (node === 'escalate') {
+          // 'escalate' isn't a step shown in the Pipeline list (PIPELINE_ORDER
+          // only covers the happy path) — the evaluator's own node_completed
+          // already speculatively advanced the *next* happy-path step
+          // (personalise) to 'active' before the graph's conditional edge
+          // actually routed here instead. Without this, that step is left
+          // spinning forever even after the run has finished.
+          setSteps((s) => {
+            const next = { ...s }
+            for (const key of Object.keys(next)) {
+              if (next[key] === 'active') next[key] = 'failed'
+            }
+            return next
+          })
+          break
+        }
+
         setSteps((s) => {
           const next = { ...s, [node]: 'done' as StepStatus }
           const orderIdx = PIPELINE_ORDER.indexOf(node)
@@ -89,7 +107,13 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
         break
       }
       case 'state_changed':
-        addLog(`State → ${d.state}`, 'info')
+        addLog(`State → ${d.state}`, d.state === 'ESCALATED' ? 'bad' : 'info')
+        if (d.state === 'ESCALATED') {
+          // Backend sends state_changed but no pipeline_completed/failed on
+          // this path — treat it as terminal here too so the UI can't be
+          // left showing a spinner with no explanation.
+          setFinished('failed')
+        }
         break
       case 'pipeline_completed':
         addLog(
@@ -228,6 +252,20 @@ export default function GenerateTab({ campaign }: { campaign: Campaign }) {
             Subject: <span className="text-foreground">{campaign.email_subject}</span>
           </p>
           <p className="mt-1 text-xs text-slate-500">See the “Email Preview” tab for the full body.</p>
+        </div>
+      )}
+
+      {finished === 'failed' && (
+        <div className="card border-cyber-red/30">
+          <div className="mb-2 flex items-center gap-2 text-cyber-red">
+            <XCircle className="h-4 w-4" />
+            <span className="font-semibold">Generation didn't complete</span>
+          </div>
+          <p className="text-sm text-slate-400">
+            {campaign.state === 'ESCALATED'
+              ? "The Realism Evaluator couldn't get a passing draft after the configured retry limit. This campaign needs manual review — edit the template yourself or hit “Re-generate” to try again from scratch."
+              : 'See the log above for details. Hit “Generate emails” to try again.'}
+          </p>
         </div>
       )}
     </div>

@@ -9,6 +9,12 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
+    # Fail fast instead of hanging a request indefinitely: pool_timeout caps
+    # how long a request waits for a free connection when the pool is
+    # exhausted, and connect_args' timeout caps establishing a brand new
+    # connection to Neon (asyncpg's own connect() kwarg).
+    pool_timeout=10,
+    connect_args={"timeout": 5},
 )
 
 AsyncSessionLocal = async_sessionmaker(

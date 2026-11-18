@@ -68,7 +68,12 @@ async def campaign_planner_node(state: AgentState) -> AgentState:
     # RAG: retrieve relevant phishing patterns as context
     query = f"{state.get('attack_vector', '')} phishing {state.get('target_department', '')} department"
     try:
-        rag_patterns = retrieve_patterns(query, k=settings.RAG_TOP_K)
+        # retrieve_patterns is synchronous (ChromaDB's ONNX embedding
+        # inference + query are both CPU-bound, blocking calls) — running it
+        # directly here would stall the single event loop for every other
+        # in-flight request (listing campaigns, targets, etc.) for as long
+        # as it takes. to_thread hands it to a worker thread instead.
+        rag_patterns = await asyncio.to_thread(retrieve_patterns, query, settings.RAG_TOP_K)
     except Exception as e:
         log.warning("campaign_planner.rag_failed", error=str(e))
         rag_patterns = []
