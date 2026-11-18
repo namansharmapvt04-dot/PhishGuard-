@@ -72,6 +72,14 @@ def inject_tracking(body_html: str, base_url: str, tracking_token: str) -> str:
     # out anything that still looks like a URL after the href pass too.
     tracked = _BARE_URL_RE.sub(lambda m: click_url if m.group(0) != click_url else m.group(0), tracked)
 
+    # Last-resort guarantee: if the body had neither an href nor a bare URL
+    # at all (the model ignored the {TRACKING_LINK} instruction entirely and
+    # wrote plain prose), both passes above are no-ops and the email would
+    # ship with zero clickable link — defeating the whole simulation. Append
+    # an explicit CTA rather than let that happen silently.
+    if click_url not in tracked:
+        tracked += f'<p><a href="{click_url}">Verify Account Details</a></p>'
+
     pixel = f'<img src="{base_url}/track/open/{tracking_token}" width="1" height="1" style="display:none" alt="">'
     return f"{tracked}{pixel}"
 

@@ -50,4 +50,7 @@ class Target(Base):
 
     # Relationships
     campaign: Mapped = relationship("Campaign", back_populates="targets")
-    tracking_events: Mapped[list["TrackingEvent"]] = relationship("TrackingEvent", back_populates="target")
+    # See the matching comment on Campaign.tracking_events — same NOT NULL
+    # FK vs. default disassociate-cascade crash, just reached via deleting
+    # a target directly instead of its whole campaign.
+    tracking_events: Mapped[list["TrackingEvent"]] = relationship("TrackingEvent", back_populates="target", cascade="all, delete-orphan")

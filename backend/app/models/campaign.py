@@ -71,4 +71,12 @@ class Campaign(Base):
     organization: Mapped = relationship("Organization", back_populates="campaigns")
     created_by: Mapped = relationship("User", back_populates="campaigns")
     targets: Mapped[list["Target"]] = relationship("Target", back_populates="campaign", cascade="all, delete-orphan")
-    tracking_events: Mapped[list["TrackingEvent"]] = relationship("TrackingEvent", back_populates="campaign")
+    # Without delete-orphan, deleting a campaign makes SQLAlchemy try to
+    # NULL out tracking_events.campaign_id (its default disassociate
+    # behavior) instead of deleting the rows — but that column is NOT
+    # NULL, so it crashes with an IntegrityError the moment a campaign
+    # with any tracking activity is deleted. The FK's own
+    # ondelete="CASCADE" (tracking.py) only helps at the raw-SQL level;
+    # the ORM's unit-of-work manages this relationship before that ever
+    # gets a chance to run.
+    tracking_events: Mapped[list["TrackingEvent"]] = relationship("TrackingEvent", back_populates="campaign", cascade="all, delete-orphan")
