@@ -41,17 +41,15 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
-    # Email sending (Resend's HTTP API — Gmail SMTP worked locally but
-    # Render's free-tier web services block outbound SMTP (port 587/25)
-    # entirely, so sends there always timed out. HTTPS isn't blocked, hence
-    # an HTTP-based provider instead. Brevo was tried before that and got
-    # stuck in an unexplained "sending platform disabled" state.)
-    RESEND_API_KEY: str = ""
-    # Resend's sandbox default — without a verified domain, Resend only
-    # allows sending AS this address, and only TO the address the Resend
-    # account itself was signed up with. Verifying a domain (free, just DNS
-    # records) lifts both restrictions and lets this be a real "From" address.
-    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
+    # Email sending (Brevo's HTTP transactional API — Gmail SMTP worked
+    # locally but Render's free-tier web services block outbound SMTP
+    # (port 587/25) entirely, so sends there always timed out. Resend was
+    # tried after that, but its sandbox mode (no verified domain) can only
+    # send TO the Resend account's own signup address, which blocks any
+    # other recipient. Brevo's free tier sends to any recipient once a
+    # single sender address is verified — no domain/DNS required.)
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
     EMAIL_DAILY_LIMIT: int = 450
 
     # App

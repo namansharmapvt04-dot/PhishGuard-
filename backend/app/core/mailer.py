@@ -1,12 +1,13 @@
 """
-Outbound email via Resend's HTTP API.
-https://resend.com/docs/api-reference/emails/send-email
+Outbound email via Brevo's HTTP transactional-email API.
+https://developers.brevo.com/reference/sendtransacemail
 
-Previously Gmail SMTP — switched because Render's free-tier web services
-block outbound SMTP (port 587/25) entirely, as an anti-abuse measure common
-across free PaaS tiers. Sending over HTTPS instead sidesteps that
-restriction completely (confirmed: SMTP attempts there timed out connecting
-to smtp.gmail.com, never even reaching auth).
+Previously Resend — its sandbox mode (no verified domain) can only send TO
+the email address the Resend account itself signed up with, which blocks
+sending to any real target/demo recipient. Brevo's free tier allows sending
+to any recipient once a single sender address is verified (no domain/DNS
+needed), and — like Resend — it's an HTTPS API, so Render's outbound-SMTP
+block (port 587/25) doesn't apply.
 """
 import re
 
@@ -17,7 +18,7 @@ from app.config import settings
 
 log = structlog.get_logger(__name__)
 
-RESEND_API_URL = "https://api.resend.com/emails"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 class MailerNotConfigured(Exception):
@@ -124,34 +125,31 @@ async def send_email(
     html_body: str,
     sender_name: str,
 ) -> None:
-    if not settings.RESEND_API_KEY:
-        raise MailerNotConfigured("RESEND_API_KEY not set")
+    if not settings.BREVO_API_KEY:
+        raise MailerNotConfigured("BREVO_API_KEY not set")
 
     payload = {
-        "from": f"{sender_name or 'PhishGuard'} <{settings.RESEND_FROM_EMAIL}>",
-        "to": [f"{to_name} <{to_email}>" if to_name else to_email],
+        "sender": {"name": sender_name or "PhishGuard", "email": settings.BREVO_SENDER_EMAIL},
+        "to": [{"email": to_email, "name": to_name} if to_name else {"email": to_email}],
         "subject": subject,
-        "html": html_body,
+        "htmlContent": html_body,
     }
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(
-                RESEND_API_URL,
-                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                BREVO_API_URL,
+                headers={"api-key": settings.BREVO_API_KEY, "Accept": "application/json"},
                 json=payload,
             )
         if response.status_code >= 400:
-            # Resend's error body is JSON with a human-readable "message" —
-            # e.g. the sandbox-mode restriction ("You can only send testing
-            # emails to your own email address") when no domain is verified.
             detail = response.text
             try:
                 detail = response.json().get("message", detail)
             except ValueError:
                 pass
-            raise MailerError(f"Resend API error ({response.status_code}): {detail}")
+            raise MailerError(f"Brevo API error ({response.status_code}): {detail}")
     except httpx.HTTPError as e:
         log.warning("mailer.send_failed", error=str(e), to=to_email)
-        raise MailerError(f"Resend request failed: {e}") from e
+        raise MailerError(f"Brevo request failed: {e}") from e
     log.info("mailer.sent", to=to_email)

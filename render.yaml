@@ -29,11 +29,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: RESEND_API_KEY
-        sync: false   # https://resend.com/api-keys — Gmail SMTP doesn't work
-                      # here: Render's free tier blocks outbound SMTP entirely
-      - key: RESEND_FROM_EMAIL
-        value: onboarding@resend.dev   # change once you verify your own domain
+      - key: BREVO_API_KEY
+        sync: false   # Brevo dashboard → Settings → SMTP & API → API Keys
+      - key: BREVO_SENDER_EMAIL
+        sync: false   # must be a sender verified in Brevo → Senders
       - key: FRONTEND_URL
         sync: false   # your Vercel URL(s), comma-separated
       - key: BASE_URL
