@@ -1,19 +1,23 @@
 """
-Outbound email via Gmail SMTP (a regular Gmail account + App Password).
-https://support.google.com/accounts/answer/185833
+Outbound email via Resend's HTTP API.
+https://resend.com/docs/api-reference/emails/send-email
+
+Previously Gmail SMTP — switched because Render's free-tier web services
+block outbound SMTP (port 587/25) entirely, as an anti-abuse measure common
+across free PaaS tiers. Sending over HTTPS instead sidesteps that
+restriction completely (confirmed: SMTP attempts there timed out connecting
+to smtp.gmail.com, never even reaching auth).
 """
 import re
-from email.message import EmailMessage
 
-import aiosmtplib
+import httpx
 import structlog
 
 from app.config import settings
 
 log = structlog.get_logger(__name__)
 
-GMAIL_SMTP_HOST = "smtp.gmail.com"
-GMAIL_SMTP_PORT = 587
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 class MailerNotConfigured(Exception):
@@ -120,27 +124,34 @@ async def send_email(
     html_body: str,
     sender_name: str,
 ) -> None:
-    if not settings.GMAIL_ADDRESS or not settings.GMAIL_APP_PASSWORD:
-        raise MailerNotConfigured("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set")
+    if not settings.RESEND_API_KEY:
+        raise MailerNotConfigured("RESEND_API_KEY not set")
 
-    message = EmailMessage()
-    message["From"] = f"{sender_name or 'PhishGuard'} <{settings.GMAIL_ADDRESS}>"
-    message["To"] = f"{to_name} <{to_email}>" if to_name else to_email
-    message["Subject"] = subject
-    message.set_content("This email requires an HTML-capable client to view.")
-    message.add_alternative(html_body, subtype="html")
+    payload = {
+        "from": f"{sender_name or 'PhishGuard'} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [f"{to_name} <{to_email}>" if to_name else to_email],
+        "subject": subject,
+        "html": html_body,
+    }
 
     try:
-        await aiosmtplib.send(
-            message,
-            hostname=GMAIL_SMTP_HOST,
-            port=GMAIL_SMTP_PORT,
-            start_tls=True,
-            username=settings.GMAIL_ADDRESS,
-            password=settings.GMAIL_APP_PASSWORD,
-            timeout=20,
-        )
-    except aiosmtplib.SMTPException as e:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                json=payload,
+            )
+        if response.status_code >= 400:
+            # Resend's error body is JSON with a human-readable "message" —
+            # e.g. the sandbox-mode restriction ("You can only send testing
+            # emails to your own email address") when no domain is verified.
+            detail = response.text
+            try:
+                detail = response.json().get("message", detail)
+            except ValueError:
+                pass
+            raise MailerError(f"Resend API error ({response.status_code}): {detail}")
+    except httpx.HTTPError as e:
         log.warning("mailer.send_failed", error=str(e), to=to_email)
-        raise MailerError(f"Gmail SMTP error: {e}") from e
+        raise MailerError(f"Resend request failed: {e}") from e
     log.info("mailer.sent", to=to_email)

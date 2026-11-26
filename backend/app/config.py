@@ -1,4 +1,3 @@
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -42,21 +41,18 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
-    # Email sending (Gmail SMTP — Brevo's transactional API was stuck in an
-    # unexplained "sending platform disabled" state with no error detail, so
-    # this app sends through a regular Gmail account + App Password instead)
-    GMAIL_ADDRESS: str = ""
-    GMAIL_APP_PASSWORD: str = ""
-    # Gmail's own cap is ~500 recipients/day on a free account; stay under it.
+    # Email sending (Resend's HTTP API — Gmail SMTP worked locally but
+    # Render's free-tier web services block outbound SMTP (port 587/25)
+    # entirely, so sends there always timed out. HTTPS isn't blocked, hence
+    # an HTTP-based provider instead. Brevo was tried before that and got
+    # stuck in an unexplained "sending platform disabled" state.)
+    RESEND_API_KEY: str = ""
+    # Resend's sandbox default — without a verified domain, Resend only
+    # allows sending AS this address, and only TO the address the Resend
+    # account itself was signed up with. Verifying a domain (free, just DNS
+    # records) lifts both restrictions and lets this be a real "From" address.
+    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
     EMAIL_DAILY_LIMIT: int = 450
-
-    @field_validator("GMAIL_APP_PASSWORD")
-    @classmethod
-    def _strip_app_password_spaces(cls, v: str) -> str:
-        # Google's UI displays the code as "xxxx xxxx xxxx xxxx" for
-        # readability, but the real password has no spaces — strip them so a
-        # literal copy-paste from the Google Account page still works.
-        return v.replace(" ", "")
 
     # App
     ENVIRONMENT: str = "development"

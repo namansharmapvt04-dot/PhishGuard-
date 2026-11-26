@@ -394,7 +394,7 @@ def _substitute_variables(text: str, target: Target, organization_name: str) -> 
 
 async def _reserve_quota(redis: Redis, count: int) -> int:
     """
-    Atomically reserves up to `count` sends against today's Gmail daily cap,
+    Atomically reserves up to `count` sends against today's email daily cap,
     tracked in Redis (keyed by UTC date, auto-expires next day). Returns how
     many were actually reserved (may be less than `count`, or 0).
     """
@@ -413,7 +413,7 @@ async def _reserve_quota(redis: Redis, count: int) -> int:
 async def launch_campaign(campaign_id: uuid.UUID, current_user: CurrentUser, db: DB, redis: Redis):
     """
     Sends the generated, personalised email to every PENDING target via
-    Gmail SMTP, throttled to the free-tier daily cap. Safe to call again later
+    Resend, throttled to the free-tier daily cap. Safe to call again later
     (e.g. the next day) to keep working through a target list bigger than
     one day's quota — already-SENT targets are skipped.
     """
