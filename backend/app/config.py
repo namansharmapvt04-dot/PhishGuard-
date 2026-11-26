@@ -41,15 +41,17 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
-    # Email sending (Brevo's HTTP transactional API — Gmail SMTP worked
+    # Email sending (Mailjet's HTTP transactional API — Gmail SMTP worked
     # locally but Render's free-tier web services block outbound SMTP
-    # (port 587/25) entirely, so sends there always timed out. Resend was
-    # tried after that, but its sandbox mode (no verified domain) can only
-    # send TO the Resend account's own signup address, which blocks any
-    # other recipient. Brevo's free tier sends to any recipient once a
-    # single sender address is verified — no domain/DNS required.)
-    BREVO_API_KEY: str = ""
-    BREVO_SENDER_EMAIL: str = ""
+    # (port 587/25) entirely. Resend's sandbox mode (no verified domain)
+    # can only send TO the Resend account's own signup address. Brevo's
+    # fraud-detection system then disabled the account's sending ability
+    # outright, a manual-review block unrelated to our config. Mailjet's
+    # free tier (200/day) sends to any recipient once a single sender
+    # address is verified — no domain/DNS required.)
+    MAILJET_API_KEY: str = ""
+    MAILJET_API_SECRET: str = ""
+    MAILJET_SENDER_EMAIL: str = ""
     EMAIL_DAILY_LIMIT: int = 450
 
     # App

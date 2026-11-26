@@ -1,13 +1,15 @@
 """
-Outbound email via Brevo's HTTP transactional-email API.
-https://developers.brevo.com/reference/sendtransacemail
+Outbound email via Mailjet's HTTP transactional-email API.
+https://dev.mailjet.com/email/guides/send-api-v31/
 
 Previously Resend — its sandbox mode (no verified domain) can only send TO
-the email address the Resend account itself signed up with, which blocks
-sending to any real target/demo recipient. Brevo's free tier allows sending
-to any recipient once a single sender address is verified (no domain/DNS
-needed), and — like Resend — it's an HTTPS API, so Render's outbound-SMTP
-block (port 587/25) doesn't apply.
+the email address the Resend account itself signed up with, blocking any
+real target/demo recipient. Then Brevo — whose fraud-detection system
+disabled the account's sending ability outright ("Your sending platform is
+currently disabled"), a manual-review block unrelated to our code or
+config. Mailjet's free tier (200/day) sends to any recipient once a single
+sender address is verified (no domain/DNS needed), and — like the others —
+it's an HTTPS API, so Render's outbound-SMTP block (port 587/25) doesn't apply.
 """
 import re
 
@@ -18,7 +20,7 @@ from app.config import settings
 
 log = structlog.get_logger(__name__)
 
-BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+MAILJET_API_URL = "https://api.mailjet.com/v3.1/send"
 
 
 class MailerNotConfigured(Exception):
@@ -125,31 +127,42 @@ async def send_email(
     html_body: str,
     sender_name: str,
 ) -> None:
-    if not settings.BREVO_API_KEY:
-        raise MailerNotConfigured("BREVO_API_KEY not set")
+    if not settings.MAILJET_API_KEY or not settings.MAILJET_API_SECRET:
+        raise MailerNotConfigured("MAILJET_API_KEY/MAILJET_API_SECRET not set")
 
     payload = {
-        "sender": {"name": sender_name or "PhishGuard", "email": settings.BREVO_SENDER_EMAIL},
-        "to": [{"email": to_email, "name": to_name} if to_name else {"email": to_email}],
-        "subject": subject,
-        "htmlContent": html_body,
+        "Messages": [
+            {
+                "From": {"Email": settings.MAILJET_SENDER_EMAIL, "Name": sender_name or "PhishGuard"},
+                "To": [{"Email": to_email, "Name": to_name or to_email}],
+                "Subject": subject,
+                "HTMLPart": html_body,
+            }
+        ]
     }
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(
-                BREVO_API_URL,
-                headers={"api-key": settings.BREVO_API_KEY, "Accept": "application/json"},
+                MAILJET_API_URL,
+                auth=(settings.MAILJET_API_KEY, settings.MAILJET_API_SECRET),
                 json=payload,
             )
         if response.status_code >= 400:
             detail = response.text
             try:
-                detail = response.json().get("message", detail)
-            except ValueError:
+                body = response.json()
+                detail = body.get("ErrorMessage") or body.get("Messages", [{}])[0].get("Errors", detail)
+            except (ValueError, IndexError, KeyError):
                 pass
-            raise MailerError(f"Brevo API error ({response.status_code}): {detail}")
+            raise MailerError(f"Mailjet API error ({response.status_code}): {detail}")
+        # Mailjet returns 200 even for a per-recipient failure — the real
+        # status is nested per-message, e.g. "success" vs "error".
+        body = response.json()
+        msg_status = body.get("Messages", [{}])[0].get("Status")
+        if msg_status != "success":
+            raise MailerError(f"Mailjet send not successful: {body}")
     except httpx.HTTPError as e:
         log.warning("mailer.send_failed", error=str(e), to=to_email)
-        raise MailerError(f"Brevo request failed: {e}") from e
+        raise MailerError(f"Mailjet request failed: {e}") from e
     log.info("mailer.sent", to=to_email)
