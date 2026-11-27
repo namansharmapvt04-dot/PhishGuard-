@@ -29,12 +29,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: MAILJET_API_KEY
-        sync: false   # Mailjet → Account Settings → API Key Management
-      - key: MAILJET_API_SECRET
-        sync: false
-      - key: MAILJET_SENDER_EMAIL
-        sync: false   # must be a sender verified in Mailjet → Sender addresses
+      - key: RESEND_API_KEY
+        sync: false   # https://resend.com/api-keys
+      - key: RESEND_FROM_EMAIL
+        value: onboarding@resend.dev   # change once you verify your own domain
       - key: FRONTEND_URL
         sync: false   # your Vercel URL(s), comma-separated
       - key: BASE_URL

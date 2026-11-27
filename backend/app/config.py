@@ -41,17 +41,20 @@ class Settings(BaseSettings):
     BASE_URL: str = "http://localhost:8000"
     TRACKING_WINDOW_DAYS: int = 14
 
-    # Email sending (Mailjet's HTTP transactional API — Gmail SMTP worked
-    # locally but Render's free-tier web services block outbound SMTP
-    # (port 587/25) entirely. Resend's sandbox mode (no verified domain)
-    # can only send TO the Resend account's own signup address. Brevo's
-    # fraud-detection system then disabled the account's sending ability
-    # outright, a manual-review block unrelated to our config. Mailjet's
-    # free tier (200/day) sends to any recipient once a single sender
-    # address is verified — no domain/DNS required.)
-    MAILJET_API_KEY: str = ""
-    MAILJET_API_SECRET: str = ""
-    MAILJET_SENDER_EMAIL: str = ""
+    # Email sending (Resend's HTTP API — Gmail SMTP worked locally but
+    # Render's free-tier web services block outbound SMTP (port 587/25)
+    # entirely. Brevo and Mailjet were each tried after that — both
+    # outright blocked the account the moment it sent phishing-simulation
+    # content, which trips automated fraud detection on any brand-new free
+    # ESP account. Resend never did this; its only restriction is sandbox
+    # mode (no verified domain) sending TO the account's own signup
+    # address only — a known, stable limitation rather than a surprise block.)
+    RESEND_API_KEY: str = ""
+    # Resend's sandbox default — without a verified domain, Resend only
+    # allows sending AS this address, and only TO the address the Resend
+    # account itself was signed up with. Verifying a domain (free, just DNS
+    # records) lifts both restrictions and lets this be a real "From" address.
+    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
     EMAIL_DAILY_LIMIT: int = 450
 
     # App

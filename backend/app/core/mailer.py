@@ -1,15 +1,17 @@
 """
-Outbound email via Mailjet's HTTP transactional-email API.
-https://dev.mailjet.com/email/guides/send-api-v31/
+Outbound email via Resend's HTTP API.
+https://resend.com/docs/api-reference/emails/send-email
 
-Previously Resend — its sandbox mode (no verified domain) can only send TO
-the email address the Resend account itself signed up with, blocking any
-real target/demo recipient. Then Brevo — whose fraud-detection system
-disabled the account's sending ability outright ("Your sending platform is
-currently disabled"), a manual-review block unrelated to our code or
-config. Mailjet's free tier (200/day) sends to any recipient once a single
-sender address is verified (no domain/DNS needed), and — like the others —
-it's an HTTPS API, so Render's outbound-SMTP block (port 587/25) doesn't apply.
+Gmail SMTP worked locally but Render's free-tier web services block
+outbound SMTP (port 587/25) entirely. Brevo and Mailjet were each tried
+after that — both outright disabled/blocked the account outright on a
+brand-new free tier the moment it sent phishing-simulation-style content
+("Urgent Security Alert", credential/password-reset language), which trips
+automated fraud detection almost immediately; that's a dead end regardless
+of which free ESP is used next. Resend never did this — its only
+restriction (sandbox mode, no verified domain) is that it can send TO the
+Resend account's own signup address only, which is a known, honest
+limitation rather than an unpredictable account block.
 """
 import re
 
@@ -20,7 +22,7 @@ from app.config import settings
 
 log = structlog.get_logger(__name__)
 
-MAILJET_API_URL = "https://api.mailjet.com/v3.1/send"
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 class MailerNotConfigured(Exception):
@@ -127,42 +129,34 @@ async def send_email(
     html_body: str,
     sender_name: str,
 ) -> None:
-    if not settings.MAILJET_API_KEY or not settings.MAILJET_API_SECRET:
-        raise MailerNotConfigured("MAILJET_API_KEY/MAILJET_API_SECRET not set")
+    if not settings.RESEND_API_KEY:
+        raise MailerNotConfigured("RESEND_API_KEY not set")
 
     payload = {
-        "Messages": [
-            {
-                "From": {"Email": settings.MAILJET_SENDER_EMAIL, "Name": sender_name or "PhishGuard"},
-                "To": [{"Email": to_email, "Name": to_name or to_email}],
-                "Subject": subject,
-                "HTMLPart": html_body,
-            }
-        ]
+        "from": f"{sender_name or 'PhishGuard'} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [f"{to_name} <{to_email}>" if to_name else to_email],
+        "subject": subject,
+        "html": html_body,
     }
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(
-                MAILJET_API_URL,
-                auth=(settings.MAILJET_API_KEY, settings.MAILJET_API_SECRET),
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
                 json=payload,
             )
         if response.status_code >= 400:
+            # Resend's error body is JSON with a human-readable "message" —
+            # e.g. the sandbox-mode restriction ("You can only send testing
+            # emails to your own email address") when no domain is verified.
             detail = response.text
             try:
-                body = response.json()
-                detail = body.get("ErrorMessage") or body.get("Messages", [{}])[0].get("Errors", detail)
-            except (ValueError, IndexError, KeyError):
+                detail = response.json().get("message", detail)
+            except ValueError:
                 pass
-            raise MailerError(f"Mailjet API error ({response.status_code}): {detail}")
-        # Mailjet returns 200 even for a per-recipient failure — the real
-        # status is nested per-message, e.g. "success" vs "error".
-        body = response.json()
-        msg_status = body.get("Messages", [{}])[0].get("Status")
-        if msg_status != "success":
-            raise MailerError(f"Mailjet send not successful: {body}")
+            raise MailerError(f"Resend API error ({response.status_code}): {detail}")
     except httpx.HTTPError as e:
         log.warning("mailer.send_failed", error=str(e), to=to_email)
-        raise MailerError(f"Mailjet request failed: {e}") from e
+        raise MailerError(f"Resend request failed: {e}") from e
     log.info("mailer.sent", to=to_email)
