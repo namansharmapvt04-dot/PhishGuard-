@@ -88,13 +88,17 @@ async def track_click(token: str, request: Request):
     target = await _record_event(token, EventType.LINK_CLICKED, request)
     if target:
         async for db in get_db():
+            # .first() rather than scalar_one_or_none(): the open pixel
+            # doesn't dedupe either (every image load/preview inserts a row),
+            # so more than one EMAIL_OPENED row for this target is normal —
+            # scalar_one_or_none() would raise MultipleResultsFound on that.
             already_opened = await db.execute(
                 select(TrackingEvent).where(
                     TrackingEvent.target_id == target.id,
                     TrackingEvent.event_type == EventType.EMAIL_OPENED,
-                )
+                ).limit(1)
             )
-            if already_opened.scalar_one_or_none() is None:
+            if already_opened.scalars().first() is None:
                 db.add(TrackingEvent(
                     event_type=EventType.EMAIL_OPENED,
                     ip_hash=_hash_ip(request.client.host if request.client else None),
